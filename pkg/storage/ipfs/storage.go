@@ -23,11 +23,13 @@ import (
 
 type StorageProvider struct {
 	ipfsClient ipfs.Client
+	cfg        config.Context
 }
 
-func NewStorage(cl ipfs.Client) (*StorageProvider, error) {
+func NewStorage(cl ipfs.Client, c config.Context) (*StorageProvider, error) {
 	storageHandler := &StorageProvider{
 		ipfsClient: cl,
+		cfg:        c,
 	}
 
 	log.Trace().Msgf("IPFS API Copy driver created with address: %s", cl.APIAddress())
@@ -52,7 +54,7 @@ func (s *StorageProvider) GetVolumeSize(ctx context.Context, volume models.Input
 
 	// TODO(forrest) [correctness] this timeout should be passed in as a param or set on the context by the method caller.
 	// for further context on why this is the way it is see: https://github.com/bacalhau-project/bacalhau/pull/1432
-	timeoutDuration := config.GetVolumeSizeRequestTimeout()
+	timeoutDuration := config.GetVolumeSizeRequestTimeout(s.cfg)
 	ctx, cancel := context.WithTimeout(ctx, timeoutDuration)
 	defer cancel()
 

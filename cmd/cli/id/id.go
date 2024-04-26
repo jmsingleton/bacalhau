@@ -10,7 +10,6 @@ import (
 	"github.com/bacalhau-project/bacalhau/cmd/util/output"
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 	bac_libp2p "github.com/bacalhau-project/bacalhau/pkg/libp2p"
-	"github.com/bacalhau-project/bacalhau/pkg/system"
 	"github.com/bacalhau-project/bacalhau/pkg/util/closer"
 )
 
@@ -19,7 +18,7 @@ type IDInfo struct {
 	ClientID string `json:"ClientID"`
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	outputOpts := output.OutputOptions{
 		Format: output.JSONFormat,
 	}
@@ -32,10 +31,10 @@ func NewCmd() *cobra.Command {
 		Use:   "id",
 		Short: "Show bacalhau node id info",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return configflags.BindFlags(cmd, idFlags)
+			return configflags.BindFlags(cmd, cfg, idFlags)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return id(cmd, outputOpts)
+			return id(cmd, cfg, outputOpts)
 		},
 	}
 
@@ -61,12 +60,12 @@ var idColumns = []output.TableColumn[IDInfo]{
 	},
 }
 
-func id(cmd *cobra.Command, outputOpts output.OutputOptions) error {
-	privKey, err := config.GetLibp2pPrivKey()
+func id(cmd *cobra.Command, cfg config.Context, outputOpts output.OutputOptions) error {
+	privKey, err := config.GetLibp2pPrivKey(cfg)
 	if err != nil {
 		return err
 	}
-	libp2pCfg, err := config.GetLibp2pConfig()
+	libp2pCfg, err := config.GetLibp2pConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -77,9 +76,13 @@ func id(cmd *cobra.Command, outputOpts output.OutputOptions) error {
 	}
 	defer closer.CloseWithLogOnError("libp2pHost", libp2pHost)
 
+	clientID, err := config.GetClientID(cfg)
+	if err != nil {
+		return err
+	}
 	info := IDInfo{
 		ID:       libp2pHost.ID().String(),
-		ClientID: system.GetClientID(),
+		ClientID: clientID,
 	}
 
 	return output.OutputOne(cmd, idColumns, outputOpts, info)

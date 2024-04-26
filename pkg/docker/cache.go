@@ -6,8 +6,8 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 )
 
-func NewManifestCache() cache.Cache[ImageManifest] {
-	settings, _ := config.GetDockerManifestCacheSettings()
+func NewManifestCache(cfg config.Context) cache.Cache[ImageManifest] {
+	settings, _ := config.GetDockerManifestCacheSettings(cfg)
 
 	// Used by compute nodes to map requester provided image identifiers (with
 	// digest) to

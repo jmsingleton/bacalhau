@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 )
 
 const endpoint = "http://update.bacalhau.org/version"
@@ -87,22 +88,23 @@ func LogUpdateResponse(ctx context.Context, ucr *UpdateCheckResponse) {
 // (e.g. because the node running the update check is the server).
 func RunUpdateChecker(
 	ctx context.Context,
+	c config.Context,
 	getServerVersion func(context.Context) (*models.BuildVersionInfo, error),
 	responseCallback func(context.Context, *UpdateCheckResponse),
 ) {
-	updateFrequency := config.GetUpdateCheckFrequency()
+	updateFrequency := config.GetUpdateCheckFrequency(c)
 	if updateFrequency <= 0 {
 		log.Ctx(ctx).Warn().Dur(types.UpdateCheckFrequency, updateFrequency).Msg("Update frequency is zero or less so no update checks will run")
 		return
 	}
 
 	clientVersion := Get()
-	clientID, err := config.GetClientID()
+	clientID, err := config.GetClientID(c)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Failed to read client ID")
 		return
 	}
-	userID, err := config.GetInstallationUserID()
+	userID, err := config.GetInstallationUserID(c)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Failed to read user ID")
 		return
@@ -111,7 +113,7 @@ func RunUpdateChecker(
 	runUpdateCheck := func() {
 		// Check this every time, to handle programmatic changes to config that
 		// may switch this on or off.
-		if skip, err := config.Get[bool](types.UpdateSkipChecks); skip || err != nil {
+		if skip, err := config.Get[bool](c, types.UpdateSkipChecks); skip || err != nil {
 			log.Ctx(ctx).Debug().Err(err).Bool(types.UpdateSkipChecks, skip).Msg("Skipping update check due to config")
 			return
 		}
@@ -131,12 +133,12 @@ func RunUpdateChecker(
 
 		if err == nil {
 			responseCallback(ctx, updateResponse)
-			err = writeNewLastCheckTime()
+			err = writeNewLastCheckTime(c)
 			log.Ctx(ctx).WithLevel(logger.ErrOrDebug(err)).Err(err).Msg("Completed update check")
 		}
 	}
 
-	lastCheck, err := readLastCheckTime()
+	lastCheck, err := readLastCheckTime(c)
 	if err != nil {
 		// Only log if the error is not about a missing update.json
 		if !os.IsNotExist(err) {
@@ -175,8 +177,8 @@ type updateState struct {
 	LastCheck time.Time
 }
 
-func readLastCheckTime() (time.Time, error) {
-	path, err := config.Get[string](types.UpdateCheckStatePath)
+func readLastCheckTime(c config.Context) (time.Time, error) {
+	path, err := config.Get[string](c, types.UpdateCheckStatePath)
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "error getting repo path")
 	}
@@ -199,8 +201,8 @@ func readLastCheckTime() (time.Time, error) {
 	return state.LastCheck, nil
 }
 
-func writeNewLastCheckTime() error {
-	path, err := config.Get[string](types.UpdateCheckStatePath)
+func writeNewLastCheckTime(c config.Context) error {
+	path, err := config.Get[string](c, types.UpdateCheckStatePath)
 	if err != nil {
 		return errors.Wrap(err, "error getting repo path")
 	}

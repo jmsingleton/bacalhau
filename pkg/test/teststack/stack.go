@@ -52,6 +52,7 @@ func Setup(
 	// NB: if a test suite has defined a repo use it, otherwise make one.
 	repoPath := os.Getenv("BACALHAU_DIR")
 	var fsRepo *repo.FsRepo
+	cfg := config.New()
 	if repoPath != "" {
 		var err error
 		fsRepo, err = repo.NewFS(repo.FsRepoParams{
@@ -60,13 +61,13 @@ func Setup(
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := fsRepo.Open(); err != nil {
+		if err := fsRepo.Open(cfg); err != nil {
 			t.Fatal(err)
 		}
 
 		// TODO(ross) - Remove this once compute node registration lock does not rely on
 		// this config for finding it's storage path.
-		config.SetValue("repo", repoPath)
+		cfg.Set("repo", repoPath)
 	} else {
 		fsRepo = setup.SetupBacalhauRepoForTesting(t)
 	}
@@ -75,7 +76,7 @@ func Setup(
 	t.Cleanup(func() {
 		cm.Cleanup(ctx)
 	})
-	stack, err := devstack.Setup(ctx, cm, fsRepo, append(testDevStackConfig().Options(), opts...)...)
+	stack, err := devstack.Setup(ctx, cfg, cm, fsRepo, append(testDevStackConfig().Options(), opts...)...)
 	if err != nil {
 		t.Fatalf("creating teststack: %s", err)
 	}
@@ -90,10 +91,10 @@ func Setup(
 	return stack
 }
 
-func WithNoopExecutor(noopConfig noop_executor.ExecutorConfig) devstack.ConfigOption {
+func WithNoopExecutor(noopConfig noop_executor.ExecutorConfig, cfg config.Context) devstack.ConfigOption {
 	return devstack.WithDependencyInjector(node.NodeDependencyInjector{
 		ExecutorsFactory: &mixedExecutorFactory{
-			standardFactory: node.NewStandardExecutorsFactory(),
+			standardFactory: node.NewStandardExecutorsFactory(cfg),
 			noopFactory:     devstack.NewNoopExecutorsFactoryWithConfig(noopConfig),
 		},
 	})

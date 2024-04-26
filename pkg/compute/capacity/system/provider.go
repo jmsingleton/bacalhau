@@ -18,15 +18,18 @@ import (
 
 type PhysicalCapacityProvider struct {
 	gpuCapacityProviders []capacity.Provider
+	// TODO(forrest) [refactor]: this should accept a path, instead of the config context.
+	config config.Context
 }
 
-func NewPhysicalCapacityProvider() *PhysicalCapacityProvider {
+func NewPhysicalCapacityProvider(c config.Context) *PhysicalCapacityProvider {
 	return &PhysicalCapacityProvider{
 		gpuCapacityProviders: []capacity.Provider{
 			gpu.NewNvidiaGPUProvider(),
 			gpu.NewAMDGPUProvider(),
 			gpu.NewIntelGPUProvider(),
 		},
+		config: c,
 	}
 }
 
@@ -46,7 +49,7 @@ func (p *PhysicalCapacityProvider) GetAvailableCapacity(ctx context.Context) (mo
 }
 
 func (p *PhysicalCapacityProvider) GetTotalCapacity(ctx context.Context) (models.Resources, error) {
-	diskSpace, err := getFreeDiskSpace(config.GetStoragePath())
+	diskSpace, err := getFreeDiskSpace(config.GetStoragePath(p.config))
 	if err != nil {
 		return models.Resources{}, err
 	}

@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bacalhau-project/bacalhau/pkg/config"
-	"github.com/bacalhau-project/bacalhau/pkg/repo/migrations"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/config/configenv"
+	"github.com/bacalhau-project/bacalhau/pkg/repo/migrations"
 
 	"github.com/bacalhau-project/bacalhau/pkg/repo"
 )
@@ -23,7 +24,7 @@ func SetupMigrationManager() (*repo.MigrationManager, error) {
 }
 
 // SetupBacalhauRepo ensures that a bacalhau repo and config exist and are initialized.
-func SetupBacalhauRepo(repoDir string) (*repo.FsRepo, error) {
+func SetupBacalhauRepo(repoDir string, c config.Context) (*repo.FsRepo, error) {
 	migrationManger, err := SetupMigrationManager()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migration manager: %w", err)
@@ -42,11 +43,11 @@ func SetupBacalhauRepo(repoDir string) (*repo.FsRepo, error) {
 
 		return nil, fmt.Errorf("failed to check if repo exists: %w", err)
 	} else if !exists {
-		if err := fsRepo.Init(); err != nil {
+		if err := fsRepo.Init(c); err != nil {
 			return nil, fmt.Errorf("failed to initialize repo: %w", err)
 		}
 	} else {
-		if err := fsRepo.Open(); err != nil {
+		if err := fsRepo.Open(c); err != nil {
 			return nil, fmt.Errorf("failed to open repo: %w", err)
 		}
 	}
@@ -54,7 +55,7 @@ func SetupBacalhauRepo(repoDir string) (*repo.FsRepo, error) {
 }
 
 func SetupBacalhauRepoForTesting(t testing.TB) *repo.FsRepo {
-	viper.Reset()
+	cfg := config.New(config.WithDefaultConfig(configenv.Local))
 
 	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -62,12 +63,12 @@ func SetupBacalhauRepoForTesting(t testing.TB) *repo.FsRepo {
 	}
 
 	path := filepath.Join(tmpDir, fmt.Sprint(time.Now().UnixNano()))
-	config.SetValue("repo", path)
+	cfg.System().Set("repo", path)
 
 	t.Logf("creating repo for testing at: %s", path)
 	t.Setenv("BACALHAU_ENVIRONMENT", "local")
 	t.Setenv("BACALHAU_DIR", path)
-	fsRepo, err := SetupBacalhauRepo(path)
+	fsRepo, err := SetupBacalhauRepo(path, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

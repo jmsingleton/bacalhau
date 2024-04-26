@@ -14,14 +14,16 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/bacalhau-project/bacalhau/pkg/bacerrors"
-	"github.com/bacalhau-project/bacalhau/pkg/lib/marshaller"
-	"github.com/bacalhau-project/bacalhau/pkg/publicapi/signatures"
-	"github.com/bacalhau-project/bacalhau/pkg/system"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/bacalhau-project/bacalhau/pkg/bacerrors"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/lib/marshaller"
+	"github.com/bacalhau-project/bacalhau/pkg/publicapi/signatures"
+	"github.com/bacalhau-project/bacalhau/pkg/system"
 )
 
 var NoTLS = LegacyTLSSupport{UseTLS: false}
@@ -31,6 +33,9 @@ type APIClient struct {
 	BaseURI        *url.URL
 	DefaultHeaders map[string]string
 	Client         *http.Client
+	Signer         system.Signer
+	Config         config.Context
+	ClientID       string
 }
 
 // LegacyTLSSupport contains information on how to use TLS (or not) to communicate
@@ -43,7 +48,14 @@ type LegacyTLSSupport struct {
 
 // NewAPIClient returns a new client for a node's API server against v1 APIs
 // the client will use /api/v1 path by default is no custom path is defined
-func NewAPIClient(tlsinfo LegacyTLSSupport, host string, port uint16, path ...string) *APIClient {
+func NewAPIClient(
+	tlsinfo LegacyTLSSupport,
+	c config.Context,
+	s system.Signer,
+	host string,
+	port uint16,
+	path ...string,
+) (*APIClient, error) {
 	scheme := "http"
 	if tlsinfo.UseTLS {
 		scheme = "https"
@@ -53,21 +65,29 @@ func NewAPIClient(tlsinfo LegacyTLSSupport, host string, port uint16, path ...st
 
 	tr := getTLSTransport(tlsinfo)
 
+	clientID, err := config.GetClientID(c)
+	if err != nil {
+		return nil, err
+	}
+
 	return &APIClient{
 		BaseURI:        baseURI,
 		DefaultHeaders: map[string]string{},
+		Signer:         s,
+		ClientID:       clientID,
+		Config:         c,
 
 		Client: &http.Client{
 			Timeout: 300 * time.Second,
 			Transport: otelhttp.NewTransport(tr,
 				otelhttp.WithSpanOptions(
 					trace.WithAttributes(
-						attribute.String("clientID", system.GetClientID()),
+						attribute.String("clientID", clientID),
 					),
 				),
 			),
 		},
-	}
+	}, nil
 }
 
 // getTLSTransport builds a http.Transport from the TLS options
@@ -118,7 +138,7 @@ func (apiClient *APIClient) doPostSigned(ctx context.Context, api string, reqDat
 	ctx, span := system.NewSpan(ctx, system.GetTracer(), "pkg/publicapi.Client.DoPostSigned")
 	defer span.End()
 
-	req, err := signatures.SignRequest(reqData)
+	req, err := signatures.SignRequest(apiClient.Signer, reqData)
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/version"
 
 	"github.com/bacalhau-project/bacalhau/cmd/util"
@@ -42,7 +43,7 @@ func NewVersionOptions() *VersionOptions {
 	}
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	oV := NewVersionOptions()
 
 	versionCmd := &cobra.Command{
@@ -51,7 +52,7 @@ func NewCmd() *cobra.Command {
 		Args:   cobra.NoArgs,
 		PreRun: hook.ApplyPorcelainLogLevel,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runVersion(cmd, oV)
+			return runVersion(cmd, cfg, oV)
 		},
 	}
 	versionCmd.Flags().BoolVar(&oV.ClientOnly, "client", oV.ClientOnly, "If true, shows client version only (no server required).")
@@ -60,10 +61,10 @@ func NewCmd() *cobra.Command {
 	return versionCmd
 }
 
-func runVersion(cmd *cobra.Command, oV *VersionOptions) error {
+func runVersion(cmd *cobra.Command, cfg config.Context, oV *VersionOptions) error {
 	ctx := cmd.Context()
 
-	err := oV.Run(ctx, cmd)
+	err := oV.Run(ctx, cmd, cfg)
 	if err != nil {
 		return fmt.Errorf("error running version: %w", err)
 	}
@@ -91,7 +92,7 @@ var updateMessageColumn = output.TableColumn[util.Versions]{
 	Value:        func(v util.Versions) string { return v.UpdateMessage },
 }
 
-func (oV *VersionOptions) Run(ctx context.Context, cmd *cobra.Command) error {
+func (oV *VersionOptions) Run(ctx context.Context, cmd *cobra.Command, cfg config.Context) error {
 	var (
 		versions util.Versions
 		columns  []output.TableColumn[util.Versions]
@@ -101,7 +102,7 @@ func (oV *VersionOptions) Run(ctx context.Context, cmd *cobra.Command) error {
 		versions.ClientVersion = version.Get()
 	} else {
 		var err error
-		versions, err = util.GetAllVersions(ctx)
+		versions, err = util.GetAllVersions(ctx, cfg)
 		if err != nil {
 			// No error on fail of version check. Just print as much as we can.
 			log.Ctx(ctx).Warn().Err(err).Msg("failed to get updated versions")

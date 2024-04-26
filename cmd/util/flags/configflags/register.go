@@ -11,6 +11,7 @@ import (
 	"github.com/bacalhau-project/bacalhau/cmd/util"
 	"github.com/bacalhau-project/bacalhau/cmd/util/flags"
 	"github.com/bacalhau-project/bacalhau/pkg/bidstrategy/semantic"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
@@ -43,14 +44,22 @@ type Definition struct {
 
 // BindFlags binds flags from a command to Viper using the provided definitions.
 // This method should be called in command `PreRun`
-func BindFlags(cmd *cobra.Command, register map[string][]Definition) error {
+func BindFlags(cmd *cobra.Command, c config.Context, register map[string][]Definition) error {
+	seen := make(map[string]Definition)
 	for _, defs := range register {
 		for _, def := range defs {
+			// sanity check to ensure we are not binding a config key on more than one flag.
+			if dup, ok := seen[def.ConfigPath]; ok {
+				return fmt.Errorf("DEVELOPER ERROR: duplicate regsistration of config key %s for flag %s"+
+					" previously registerd on on flag %s", def.ConfigPath, def.FlagName, dup.FlagName)
+			}
+			seen[def.ConfigPath] = def
+
 			// set the default value
-			viper.SetDefault(def.ConfigPath, def.DefaultValue)
+			c.User().SetDefault(def.ConfigPath, def.DefaultValue)
 
 			// Bind the flag to viper
-			if err := viper.BindPFlag(def.ConfigPath, cmd.Flags().Lookup(def.FlagName)); err != nil {
+			if err := c.User().BindPFlag(def.ConfigPath, cmd.Flags().Lookup(def.FlagName)); err != nil {
 				return err
 			}
 
@@ -66,9 +75,9 @@ func BindFlags(cmd *cobra.Command, register map[string][]Definition) error {
 }
 
 // PreRun returns a run hook that binds the passed flag sets onto the command.
-func PreRun(flags map[string][]Definition) func(*cobra.Command, []string) error {
+func PreRun(c config.Context, flags map[string][]Definition) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		err := BindFlags(cmd, flags)
+		err := BindFlags(cmd, c, flags)
 		if err != nil {
 			util.Fatal(cmd, err, 1)
 		}

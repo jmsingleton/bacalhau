@@ -44,11 +44,13 @@ type StorageProviderParams struct {
 
 type StorageProvider struct {
 	clientProvider *s3helper.ClientProvider
+	cfg            config.Context
 }
 
-func NewStorage(params StorageProviderParams) *StorageProvider {
+func NewStorage(c config.Context, provider *s3helper.ClientProvider) *StorageProvider {
 	return &StorageProvider{
-		clientProvider: params.ClientProvider,
+		clientProvider: provider,
+		cfg:            c,
 	}
 }
 
@@ -68,7 +70,7 @@ func (s *StorageProvider) HasStorageLocally(_ context.Context, _ models.InputSou
 }
 
 func (s *StorageProvider) GetVolumeSize(ctx context.Context, volume models.InputSource) (uint64, error) {
-	ctx, cancel := context.WithTimeout(ctx, config.GetVolumeSizeRequestTimeout())
+	ctx, cancel := context.WithTimeout(ctx, config.GetVolumeSizeRequestTimeout(s.cfg))
 	defer cancel()
 
 	source, err := s3helper.DecodeSourceSpec(volume.Source)

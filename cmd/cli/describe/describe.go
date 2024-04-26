@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels/legacymodels"
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"sigs.k8s.io/yaml"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels/legacymodels"
 
 	"github.com/bacalhau-project/bacalhau/cmd/util"
 	"github.com/bacalhau-project/bacalhau/cmd/util/hook"
@@ -48,7 +50,7 @@ func NewDescribeOptions() *DescribeOptions {
 	}
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	OD := NewDescribeOptions()
 
 	describeCmd := &cobra.Command{
@@ -60,7 +62,7 @@ func NewCmd() *cobra.Command {
 		PreRunE:  hook.RemoteCmdPreRunHooks,
 		PostRunE: hook.RemoteCmdPostRunHooks,
 		RunE: func(cmd *cobra.Command, cmdArgs []string) error {
-			return describe(cmd, cmdArgs, OD)
+			return describe(cmd, cfg, cmdArgs, OD)
 		},
 	}
 
@@ -80,7 +82,7 @@ func NewCmd() *cobra.Command {
 	return describeCmd
 }
 
-func describe(cmd *cobra.Command, cmdArgs []string, OD *DescribeOptions) error {
+func describe(cmd *cobra.Command, cfg config.Context, cmdArgs []string, OD *DescribeOptions) error {
 	ctx := cmd.Context()
 
 	if err := cmd.ParseFlags(cmdArgs[1:]); err != nil {
@@ -98,7 +100,11 @@ func describe(cmd *cobra.Command, cmdArgs []string, OD *DescribeOptions) error {
 		}
 		inputJobID = string(byteResult)
 	}
-	j, foundJob, err := util.GetAPIClient(ctx).Get(ctx, inputJobID)
+	api, err := util.GetAPIClient(cfg)
+	if err != nil {
+		return err
+	}
+	j, foundJob, err := api.Get(ctx, inputJobID)
 
 	if err != nil {
 		if errResp, ok := err.(*bacerrors.ErrorResponse); ok {
@@ -114,7 +120,7 @@ func describe(cmd *cobra.Command, cmdArgs []string, OD *DescribeOptions) error {
 	jobDesc := j
 
 	if OD.IncludeEvents {
-		jobEvents, err := util.GetAPIClient(ctx).GetEvents(ctx, j.Job.Metadata.ID, legacymodels.EventFilterOptions{})
+		jobEvents, err := api.GetEvents(ctx, j.Job.Metadata.ID, legacymodels.EventFilterOptions{})
 		if err != nil {
 			return fmt.Errorf("failure retrieving job events '%s': %w", j.Job.Metadata.ID, err)
 		}

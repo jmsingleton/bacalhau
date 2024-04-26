@@ -62,7 +62,7 @@ func newDevStackOptions() *devstack.DevStackOptions {
 	}
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	ODs := newDevStackOptions()
 	IsNoop := false
 	devstackFlags := map[string][]configflags.Definition{
@@ -82,10 +82,10 @@ func NewCmd() *cobra.Command {
 		Long:    devStackLong,
 		Example: devstackExample,
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return configflags.BindFlags(cmd, devstackFlags)
+			return configflags.BindFlags(cmd, cfg, devstackFlags)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runDevstack(cmd, ODs, IsNoop)
+			return runDevstack(cmd, cfg, ODs, IsNoop)
 		},
 	}
 
@@ -152,7 +152,7 @@ func NewCmd() *cobra.Command {
 }
 
 //nolint:gocyclo,funlen
-func runDevstack(cmd *cobra.Command, ODs *devstack.DevStackOptions, IsNoop bool) error {
+func runDevstack(cmd *cobra.Command, cfg config.Context, ODs *devstack.DevStackOptions, IsNoop bool) error {
 	ctx := cmd.Context()
 
 	cm := util.GetCleanupManager(ctx)
@@ -166,17 +166,17 @@ func runDevstack(cmd *cobra.Command, ODs *devstack.DevStackOptions, IsNoop bool)
 
 		// If we don't set the repo value in config, readers will be given
 		// a different path to the one we've just created. Presumably a default.
-		config.SetValue("repo", repoPath)
+		cfg.System().Set("repo", repoPath)
 		defer os.RemoveAll(repoPath)
 	}
 
-	fsRepo, err := setup.SetupBacalhauRepo(repoPath)
+	fsRepo, err := setup.SetupBacalhauRepo(repoPath, cfg)
 	if err != nil {
 		return err
 	}
 
 	// make sure we don't run devstack with a custom IPFS path - that must be used only with serve
-	if path, err := config.Get[string](types.NodeIPFSServePath); err == nil && path != "" {
+	if path, err := config.Get[string](cfg, types.NodeIPFSServePath); err == nil && path != "" {
 		flag, _ := lo.Find(configflags.IPFSFlags, func(item configflags.Definition) bool { return item.ConfigPath == types.NodeIPFSServePath })
 		return fmt.Errorf("unset %s in your environment "+
 			"and/or --%s from your flags "+
@@ -208,12 +208,12 @@ func runDevstack(cmd *cobra.Command, ODs *devstack.DevStackOptions, IsNoop bool)
 		}
 	}
 
-	computeConfig, err := serve.GetComputeConfig(ctx, true)
+	computeConfig, err := serve.GetComputeConfig(ctx, cfg, true)
 	if err != nil {
 		return err
 	}
 
-	requesterConfig, err := serve.GetRequesterConfig(ctx, true)
+	requesterConfig, err := serve.GetRequesterConfig(ctx, cfg, true)
 	if err != nil {
 		return err
 	}
@@ -225,16 +225,16 @@ func runDevstack(cmd *cobra.Command, ODs *devstack.DevStackOptions, IsNoop bool)
 	if IsNoop {
 		options = append(options, devstack.WithDependencyInjector(devstack.NewNoopNodeDependencyInjector()))
 	} else if ODs.ExecutorPlugins {
-		options = append(options, devstack.WithDependencyInjector(node.NewExecutorPluginNodeDependencyInjector()))
+		options = append(options, devstack.WithDependencyInjector(node.NewExecutorPluginNodeDependencyInjector(cfg)))
 	} else {
-		options = append(options, devstack.WithDependencyInjector(node.NewStandardNodeDependencyInjector()))
+		options = append(options, devstack.WithDependencyInjector(node.NewStandardNodeDependencyInjector(cfg)))
 	}
 
 	// Get any certificate settings for devstack and use them if we have a certificate (possibly self-signed).
-	cert, key := config.GetRequesterCertificateSettings()
+	cert, key := config.GetRequesterCertificateSettings(cfg)
 	options = append(options, devstack.WithSelfSignedCertificate(cert, key))
 
-	stack, err := devstack.Setup(ctx, cm, fsRepo, options...)
+	stack, err := devstack.Setup(ctx, cfg, cm, fsRepo, options...)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func runDevstack(cmd *cobra.Command, ODs *devstack.DevStackOptions, IsNoop bool)
 		return fmt.Errorf("error writing out pid file: %v: %w", pidFileName, err)
 	}
 
-	if config.GetLogMode() == logger.LogModeStation {
+	if config.GetLogMode(cfg) == logger.LogModeStation {
 		for _, node := range stack.Nodes {
 			if node.IsComputeNode() {
 				cmd.Printf("API: %s\n", node.APIServer.GetURI().JoinPath("/api/v1/compute/debug"))

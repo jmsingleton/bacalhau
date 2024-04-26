@@ -9,6 +9,7 @@ import (
 	"github.com/bacalhau-project/bacalhau/cmd/util"
 	"github.com/bacalhau-project/bacalhau/cmd/util/flags/cliflags"
 	"github.com/bacalhau-project/bacalhau/cmd/util/output"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 )
 
 // VersionOptions is a struct to support version command
@@ -23,22 +24,28 @@ func NewVersionOptions() *VersionOptions {
 	}
 }
 
-func NewVersionCmd() *cobra.Command {
+func NewVersionCmd(cfg config.Context) *cobra.Command {
 	oV := NewVersionOptions()
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Get the agent version.",
 		Args:  cobra.NoArgs,
-		RunE:  oV.runVersion,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return oV.runVersion(cmd, cfg)
+		},
 	}
 	versionCmd.Flags().AddFlagSet(cliflags.OutputNonTabularFormatFlags(&oV.OutputOpts))
 	return versionCmd
 }
 
 // Run executes version command
-func (oV *VersionOptions) runVersion(cmd *cobra.Command, _ []string) error {
+func (oV *VersionOptions) runVersion(cmd *cobra.Command, cfg config.Context) error {
 	ctx := cmd.Context()
-	serverVersionResponse, err := util.GetAPIClientV2(cmd).Agent().Version(ctx)
+	api, err := util.GetAPIClientV2(cmd, cfg)
+	if err != nil {
+		return err
+	}
+	serverVersionResponse, err := api.Agent().Version(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get server version: %w", err)
 	}

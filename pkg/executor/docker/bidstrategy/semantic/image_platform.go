@@ -22,13 +22,13 @@ var _ bidstrategy.SemanticBidStrategy = (*ImagePlatformBidStrategy)(nil)
 var ManifestCache cache.Cache[docker.ImageManifest]
 var mu sync.Mutex
 
-func NewImagePlatformBidStrategy(client *docker.Client) *ImagePlatformBidStrategy {
+func NewImagePlatformBidStrategy(client *docker.Client, cfg config.Context) *ImagePlatformBidStrategy {
 	mu.Lock()
 	// We will create the local reference to a manifest cache on demand,
 	// ensuring that we lock access to the cache here to avoid race
 	// conditions
 	if ManifestCache == nil {
-		ManifestCache = docker.NewManifestCache()
+		ManifestCache = docker.NewManifestCache(cfg)
 	}
 	mu.Unlock()
 

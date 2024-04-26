@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/lib/concurrency"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
 	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels"
-	"github.com/spf13/cobra"
 
 	"github.com/bacalhau-project/bacalhau/pkg/bacerrors"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
@@ -24,7 +26,7 @@ type LogOptions struct {
 	Tail        bool
 }
 
-func Logs(cmd *cobra.Command, options LogOptions) error {
+func Logs(cmd *cobra.Command, cfg config.Context, options LogOptions) error {
 	requestedJobID := options.JobID
 	if requestedJobID == "" {
 		var byteResult []byte
@@ -35,7 +37,10 @@ func Logs(cmd *cobra.Command, options LogOptions) error {
 		requestedJobID = string(byteResult)
 	}
 
-	apiClient := GetAPIClientV2(cmd)
+	apiClient, err := GetAPIClientV2(cmd, cfg)
+	if err != nil {
+		return err
+	}
 	ch, err := apiClient.Jobs().Logs(cmd.Context(), &apimodels.GetLogsRequest{
 		JobID:       options.JobID,
 		ExecutionID: options.ExecutionID,

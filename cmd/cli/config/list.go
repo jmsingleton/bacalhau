@@ -6,15 +6,15 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/bacalhau-project/bacalhau/cmd/util/flags/cliflags"
 	"github.com/bacalhau-project/bacalhau/cmd/util/hook"
 	"github.com/bacalhau-project/bacalhau/cmd/util/output"
 	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/setup"
 )
 
-func newListCmd() *cobra.Command {
+func newListCmd(cfg config.Context) *cobra.Command {
 	o := output.OutputOptions{
 		Format:     output.TableFormat,
 		Pretty:     true,
@@ -29,7 +29,16 @@ func newListCmd() *cobra.Command {
 		PreRunE:  hook.ClientPreRunHooks,
 		PostRunE: hook.ClientPostRunHooks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return list(cmd, o)
+			// create or open a repo
+			repoPath, err := cfg.RepoPath()
+			if err != nil {
+				return err
+			}
+			_, err = setup.SetupBacalhauRepo(repoPath, cfg)
+			if err != nil {
+				return err
+			}
+			return list(cmd, cfg, o)
 		},
 	}
 	listCmd.Flags().AddFlagSet(cliflags.OutputFormatFlags(&o))
@@ -41,15 +50,14 @@ type configListEntry struct {
 	Value interface{}
 }
 
-func list(cmd *cobra.Command, o output.OutputOptions) error {
+func list(cmd *cobra.Command, cfg config.Context, o output.OutputOptions) error {
 	o.SortBy = []table.SortBy{{
 		Name: "Key",
 		Mode: table.Asc,
 	}}
 	var cfgList []configListEntry
-	viperSchema := NewViperWithDefaultConfig(config.ForEnvironment())
-	for _, k := range viperSchema.AllKeys() {
-		v := viper.Get(k)
+	for _, k := range cfg.User().AllKeys() {
+		v := cfg.User().Get(k)
 		cfgList = append(cfgList, configListEntry{
 			Key:   k,
 			Value: v,

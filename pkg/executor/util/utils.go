@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/executor"
 	"github.com/bacalhau-project/bacalhau/pkg/executor/docker"
 	noop_executor "github.com/bacalhau-project/bacalhau/pkg/executor/noop"
@@ -16,7 +17,7 @@ import (
 	ipfs_storage "github.com/bacalhau-project/bacalhau/pkg/storage/ipfs"
 	localdirectory "github.com/bacalhau-project/bacalhau/pkg/storage/local_directory"
 	noop_storage "github.com/bacalhau-project/bacalhau/pkg/storage/noop"
-	repo "github.com/bacalhau-project/bacalhau/pkg/storage/repo"
+	"github.com/bacalhau-project/bacalhau/pkg/storage/repo"
 	"github.com/bacalhau-project/bacalhau/pkg/storage/s3"
 	"github.com/bacalhau-project/bacalhau/pkg/storage/tracing"
 	"github.com/bacalhau-project/bacalhau/pkg/storage/url/urldownload"
@@ -34,16 +35,15 @@ type StandardExecutorOptions struct {
 }
 
 func NewStandardStorageProvider(
-	_ context.Context,
-	cm *system.CleanupManager,
+	c config.Context,
 	options StandardStorageProviderOptions,
 ) (storage.StorageProvider, error) {
-	ipfsAPICopyStorage, err := ipfs_storage.NewStorage(options.API)
+	ipfsAPICopyStorage, err := ipfs_storage.NewStorage(options.API, c)
 	if err != nil {
 		return nil, err
 	}
 
-	urlDownloadStorage := urldownload.NewStorage()
+	urlDownloadStorage := urldownload.NewStorage(c)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func NewStandardStorageProvider(
 
 	inlineStorage := inline.NewStorage()
 
-	s3Storage, err := configureS3StorageProvider(cm)
+	s3Storage, err := configureS3StorageProvider(c)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func NewStandardStorageProvider(
 	}), nil
 }
 
-func configureS3StorageProvider(cm *system.CleanupManager) (*s3.StorageProvider, error) {
+func configureS3StorageProvider(c config.Context) (*s3.StorageProvider, error) {
 	cfg, err := s3helper.DefaultAWSConfig()
 	if err != nil {
 		return nil, err
@@ -88,9 +88,7 @@ func configureS3StorageProvider(cm *system.CleanupManager) (*s3.StorageProvider,
 	clientProvider := s3helper.NewClientProvider(s3helper.ClientProviderParams{
 		AWSConfig: cfg,
 	})
-	s3Storage := s3.NewStorage(s3.StorageProviderParams{
-		ClientProvider: clientProvider,
-	})
+	s3Storage := s3.NewStorage(c, clientProvider)
 	return s3Storage, nil
 }
 
@@ -104,11 +102,10 @@ func NewNoopStorageProvider(
 }
 
 func NewStandardExecutorProvider(
-	ctx context.Context,
-	cm *system.CleanupManager,
+	cfg config.Context,
 	executorOptions StandardExecutorOptions,
 ) (executor.ExecutorProvider, error) {
-	dockerExecutor, err := docker.NewExecutor(ctx, executorOptions.DockerID)
+	dockerExecutor, err := docker.NewExecutor(executorOptions.DockerID, cfg)
 	if err != nil {
 		return nil, err
 	}

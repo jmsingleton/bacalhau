@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bacalhau-project/bacalhau/pkg/downloader"
 	"github.com/rs/zerolog/log"
 
-	bac_config "github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/downloader"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/ipfs"
 	ipfssource "github.com/bacalhau-project/bacalhau/pkg/storage/ipfs"
@@ -21,6 +22,7 @@ import (
 type Downloader struct {
 	cm   *system.CleanupManager
 	node *ipfs.Node // defaults to nil
+	cfg  config.Context
 }
 
 func NewIPFSDownloader(cm *system.CleanupManager) *Downloader {
@@ -35,7 +37,7 @@ func (d *Downloader) IsInstalled(context.Context) (bool, error) {
 
 func (d *Downloader) getClient(ctx context.Context) (ipfs.Client, error) {
 	var cfg types.IpfsConfig
-	if err := bac_config.ForKey(types.NodeIPFS, &cfg); err != nil {
+	if err := d.cfg.ForKey(types.NodeIPFS, &cfg); err != nil {
 		return ipfs.Client{}, err
 	}
 

@@ -22,17 +22,18 @@ import (
 
 func NewPublisherProvider(
 	ctx context.Context,
+	c config.Context,
 	cm *system.CleanupManager,
 	cl ipfsClient.Client,
 	localConfig *types.LocalPublisherConfig,
 ) (publisher.PublisherProvider, error) {
 	noopPublisher := noop.NewNoopPublisher()
-	ipfsPublisher, err := ipfs.NewIPFSPublisher(ctx, cm, cl)
+	ipfsPublisher, err := ipfs.NewIPFSPublisher(ctx, cl)
 	if err != nil {
 		return nil, err
 	}
 
-	s3Publisher, err := configureS3Publisher(cm)
+	s3Publisher, err := configureS3Publisher(c, cm)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +48,8 @@ func NewPublisherProvider(
 	}), nil
 }
 
-func configureS3Publisher(cm *system.CleanupManager) (*s3.Publisher, error) {
-	dir, err := os.MkdirTemp(config.GetStoragePath(), "bacalhau-s3-publisher")
+func configureS3Publisher(c config.Context, cm *system.CleanupManager) (*s3.Publisher, error) {
+	dir, err := os.MkdirTemp(config.GetStoragePath(c), "bacalhau-s3-publisher")
 	if err != nil {
 		return nil, err
 	}

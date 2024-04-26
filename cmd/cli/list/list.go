@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bacalhau-project/bacalhau/pkg/util/idgen"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/util/i18n"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/util/idgen"
 
 	"github.com/bacalhau-project/bacalhau/cmd/util/flags/cliflags"
 	"github.com/bacalhau-project/bacalhau/cmd/util/hook"
@@ -65,7 +67,7 @@ func NewListOptions() *ListOptions {
 	}
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	OL := NewListOptions()
 
 	listCmd := &cobra.Command{
@@ -76,7 +78,7 @@ func NewCmd() *cobra.Command {
 		PreRunE:  hook.RemoteCmdPreRunHooks,
 		PostRunE: hook.RemoteCmdPostRunHooks,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return list(cmd, OL)
+			return list(cmd, cfg, OL)
 		},
 	}
 
@@ -171,9 +173,13 @@ var listColumns = []output.TableColumn[*model.JobWithInfo]{
 	},
 }
 
-func list(cmd *cobra.Command, OL *ListOptions) error {
+func list(cmd *cobra.Command, cfg config.Context, OL *ListOptions) error {
 	ctx := cmd.Context()
-	jobs, err := util.GetAPIClient(ctx).List(
+	api, err := util.GetAPIClient(cfg)
+	if err != nil {
+		return err
+	}
+	jobs, err := api.List(
 		ctx,
 		OL.IDFilter,
 		OL.IncludeTags,

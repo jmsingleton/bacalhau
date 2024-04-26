@@ -10,6 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+	"k8s.io/kubectl/pkg/util/i18n"
+
 	"github.com/bacalhau-project/bacalhau/cmd/util"
 	"github.com/bacalhau-project/bacalhau/cmd/util/flags/configflags"
 	"github.com/bacalhau-project/bacalhau/pkg/config"
@@ -25,12 +32,6 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/util/closer"
 	"github.com/bacalhau-project/bacalhau/pkg/util/templates"
 	"github.com/bacalhau-project/bacalhau/webui"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/util/i18n"
 )
 
 var DefaultSwarmPort = 1235
@@ -65,7 +66,7 @@ var (
 `))
 )
 
-func GetPeers(peerConnect string) ([]multiaddr.Multiaddr, error) {
+func GetPeers(cfg config.Context, peerConnect string) ([]multiaddr.Multiaddr, error) {
 	var (
 		peersStrings []string
 	)
@@ -80,7 +81,7 @@ func GetPeers(peerConnect string) ([]multiaddr.Multiaddr, error) {
 	} else if peerConnect == "config" {
 		// TODO(forrest): [ux] if the user explicitly passes the peer flag with value `config` read the
 		// bootstrap peer list from their config file.
-		return config.GetBootstrapPeers()
+		return config.GetBootstrapPeers(cfg)
 	} else {
 		peersStrings = strings.Split(peerConnect, ",")
 	}
@@ -96,7 +97,7 @@ func GetPeers(peerConnect string) ([]multiaddr.Multiaddr, error) {
 	return peers, nil
 }
 
-func NewCmd() *cobra.Command {
+func NewCmd(cfg config.Context) *cobra.Command {
 	serveFlags := map[string][]configflags.Definition{
 		"local_publisher":       configflags.LocalPublisherFlags,
 		"publishing":            configflags.PublishingFlags,
@@ -150,10 +151,10 @@ func NewCmd() *cobra.Command {
 				return the value of the last flag bound to it. This is why it's important to manage
 				flag binding thoughtfully, ensuring each command's context is respected.
 			*/
-			return configflags.BindFlags(cmd, serveFlags)
+			return configflags.BindFlags(cmd, cfg, serveFlags)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return serve(cmd)
+			return serve(cmd, cfg)
 		},
 	}
 
@@ -164,16 +165,13 @@ func NewCmd() *cobra.Command {
 }
 
 //nolint:funlen,gocyclo
-func serve(cmd *cobra.Command) error {
+func serve(cmd *cobra.Command, cfg config.Context) error {
 	ctx := cmd.Context()
 	cm := util.GetCleanupManager(ctx)
 
 	// load the repo and its config file, reading in the values, flags and env vars will override values in config.
-	repoDir, err := config.Get[string]("repo")
-	if err != nil {
-		return err
-	}
-	fsRepo, err := setup.SetupBacalhauRepo(repoDir)
+	repoDir := cfg.System().GetString("repo")
+	fsRepo, err := setup.SetupBacalhauRepo(repoDir, cfg)
 	if err != nil {
 		return err
 	}
@@ -181,20 +179,20 @@ func serve(cmd *cobra.Command) error {
 	var nodeName string
 	var libp2pHost host.Host
 	var libp2pPeers []string
-	transportType, err := getTransportType()
+	transportType, err := getTransportType(cfg)
 	if err != nil {
 		return err
 	}
 	// if the transport type is libp2p, we use the peerID as the node name
 	// even if the user provided one to avoid issues with peer lookups
 	if transportType == models.NetworkTypeLibp2p {
-		libp2pHost, libp2pPeers, err = setupLibp2p()
+		libp2pHost, libp2pPeers, err = setupLibp2p(cfg)
 		if err != nil {
 			return err
 		}
 		nodeName = libp2pHost.ID().String()
 	} else {
-		nodeName, err = getNodeID(ctx)
+		nodeName, err = getNodeID(ctx, cfg)
 		if err != nil {
 			return err
 		}
@@ -202,13 +200,13 @@ func serve(cmd *cobra.Command) error {
 	ctx = logger.ContextWithNodeIDLogger(ctx, nodeName)
 
 	// configure node type
-	isRequesterNode, isComputeNode, err := getNodeType()
+	isRequesterNode, isComputeNode, err := getNodeType(cfg)
 	if err != nil {
 		return err
 	}
 
 	// Establishing IPFS connection
-	ipfsConfig, err := getIPFSConfig()
+	ipfsConfig, err := getIPFSConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -218,7 +216,7 @@ func serve(cmd *cobra.Command) error {
 		return err
 	}
 
-	networkConfig, err := getNetworkConfig()
+	networkConfig, err := getNetworkConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -228,32 +226,35 @@ func serve(cmd *cobra.Command) error {
 		networkConfig.ClusterPeers = libp2pPeers
 	}
 
-	computeConfig, err := GetComputeConfig(ctx, isComputeNode)
+	computeConfig, err := GetComputeConfig(ctx, cfg, isComputeNode)
 	if err != nil {
 		return errors.Wrapf(err, "failed to configure compute node")
 	}
 
-	requesterConfig, err := GetRequesterConfig(ctx, isRequesterNode)
+	requesterConfig, err := GetRequesterConfig(ctx, cfg, isRequesterNode)
 	if err != nil {
 		return errors.Wrapf(err, "failed to configure requester node")
 	}
 
-	featureConfig, err := config.Get[node.FeatureConfig](types.NodeDisabledFeatures)
+	featureConfig, err := config.Get[node.FeatureConfig](cfg, types.NodeDisabledFeatures)
 	if err != nil {
 		return err
 	}
 
-	authConfig, err := config.Get[types.AuthConfig](types.Auth)
+	authConfig, err := config.Get[types.AuthConfig](cfg, types.Auth)
 	if err != nil {
 		return err
 	}
 
-	nodeInfoStoreTTL, err := config.Get[time.Duration](types.NodeNodeInfoStoreTTL)
+	nodeInfoStoreTTL, err := config.Get[time.Duration](cfg, types.NodeNodeInfoStoreTTL)
 	if err != nil {
 		return err
 	}
 
-	allowedListLocalPaths := getAllowListedLocalPathsConfig()
+	allowedListLocalPaths, err := getAllowListedLocalPathsConfig(cfg)
+	if err != nil {
+		return err
+	}
 
 	// Create node config from cmd arguments
 	nodeConfig := node.NodeConfig{
@@ -261,15 +262,15 @@ func serve(cmd *cobra.Command) error {
 		CleanupManager:        cm,
 		IPFSClient:            ipfsClient,
 		DisabledFeatures:      featureConfig,
-		HostAddress:           config.ServerAPIHost(),
-		APIPort:               config.ServerAPIPort(),
+		HostAddress:           config.ServerAPIHost(cfg),
+		APIPort:               config.ServerAPIPort(cfg),
 		ComputeConfig:         computeConfig,
 		RequesterNodeConfig:   requesterConfig,
 		AuthConfig:            authConfig,
 		IsComputeNode:         isComputeNode,
 		IsRequesterNode:       isRequesterNode,
-		RequesterSelfSign:     config.GetRequesterSelfSign(),
-		Labels:                config.GetStringMapString(types.NodeLabels),
+		RequesterSelfSign:     config.GetRequesterSelfSign(cfg),
+		Labels:                config.GetStringMapString(cfg, types.NodeLabels),
 		AllowListedLocalPaths: allowedListLocalPaths,
 		NodeInfoStoreTTL:      nodeInfoStoreTTL,
 		NetworkConfig:         networkConfig,
@@ -277,12 +278,12 @@ func serve(cmd *cobra.Command) error {
 	if isRequesterNode {
 		// We only want auto TLS for the requester node, but this info doesn't fit well
 		// with the other data in the requesterConfig.
-		nodeConfig.RequesterAutoCert = config.ServerAutoCertDomain()
-		nodeConfig.RequesterAutoCertCache = config.GetAutoCertCachePath()
+		nodeConfig.RequesterAutoCert = config.ServerAutoCertDomain(cfg)
+		nodeConfig.RequesterAutoCertCache = config.GetAutoCertCachePath(cfg)
 		// If there are configuration values for autocert we should return and let autocert
 		// do what it does later on in the setup.
 		if nodeConfig.RequesterAutoCert == "" {
-			cert, key, err := GetTLSCertificate(ctx, &nodeConfig)
+			cert, key, err := GetTLSCertificate(ctx, cfg, &nodeConfig)
 			if err != nil {
 				return err
 			}
@@ -291,26 +292,26 @@ func serve(cmd *cobra.Command) error {
 		}
 	}
 	// Create node
-	standardNode, err := node.NewNode(ctx, nodeConfig)
+	standardNode, err := node.NewNode(ctx, cfg, nodeConfig)
 	if err != nil {
 		return fmt.Errorf("error creating node: %w", err)
 	}
 	// Persist the node config after the node is created and its config is valid.
-	if err = persistConfigs(repoDir); err != nil {
+	if err = persistConfigs(repoDir, cfg); err != nil {
 		return fmt.Errorf("error persisting configs: %w", err)
 	}
 	// Start node
 	if err := standardNode.Start(ctx); err != nil {
 		return fmt.Errorf("error starting node: %w", err)
 	}
-	startWebUI, err := config.Get[bool](types.NodeWebUIEnabled)
+	startWebUI, err := config.Get[bool](cfg, types.NodeWebUIEnabled)
 	if err != nil {
 		return err
 	}
 
 	// Start up Dashboard - default: 8483
 	if startWebUI {
-		listenPort, err := config.Get[int](types.NodeWebUIPort)
+		listenPort, err := config.Get[int](cfg, types.NodeWebUIPort)
 		if err != nil {
 			return err
 		}
@@ -329,7 +330,7 @@ func serve(cmd *cobra.Command) error {
 		}()
 	}
 	// only in station logging output
-	if config.GetLogMode() == logger.LogModeStation && standardNode.IsComputeNode() {
+	if config.GetLogMode(cfg) == logger.LogModeStation && standardNode.IsComputeNode() {
 		cmd.Printf("API: %s\n", standardNode.APIServer.GetURI().JoinPath("/api/v1/compute/debug"))
 	}
 
@@ -340,7 +341,7 @@ func serve(cmd *cobra.Command) error {
 	cmd.Println()
 	cmd.Println(connectCmd)
 
-	envVars, err := buildEnvVariables(ctx, &nodeConfig, ipfsConfig)
+	envVars, err := buildEnvVariables(ctx, cfg, &nodeConfig, ipfsConfig)
 	if err != nil {
 		return err
 	}
@@ -361,18 +362,18 @@ func serve(cmd *cobra.Command) error {
 	return nil
 }
 
-func setupLibp2p() (libp2pHost host.Host, peers []string, err error) {
+func setupLibp2p(cfg config.Context) (libp2pHost host.Host, peers []string, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to setup libp2p node. %w", err)
 		}
 	}()
-	libp2pCfg, err := config.GetLibp2pConfig()
+	libp2pCfg, err := config.GetLibp2pConfig(cfg)
 	if err != nil {
 		return
 	}
 
-	privKey, err := config.GetLibp2pPrivKey()
+	privKey, err := config.GetLibp2pPrivKey(cfg)
 	if err != nil {
 		return
 	}
@@ -382,7 +383,7 @@ func setupLibp2p() (libp2pHost host.Host, peers []string, err error) {
 		return
 	}
 
-	peersAddrs, err := GetPeers(libp2pCfg.PeerConnect)
+	peersAddrs, err := GetPeers(cfg, libp2pCfg.PeerConnect)
 	if err != nil {
 		return
 	}
@@ -454,18 +455,18 @@ func buildConnectCommand(ctx context.Context, nodeConfig *node.NodeConfig, ipfsC
 	return headerB.String() + cmdB.String(), nil
 }
 
-func buildEnvVariables(ctx context.Context, nodeConfig *node.NodeConfig, ipfsConfig types.IpfsConfig) (string, error) {
+func buildEnvVariables(ctx context.Context, cfg config.Context, nodeConfig *node.NodeConfig, ipfsConfig types.IpfsConfig) (string, error) {
 	// build shell variables to connect to this node
 	envVarBuilder := strings.Builder{}
 	envVarBuilder.WriteString(fmt.Sprintf(
 		"export %s=%s\n",
 		config.KeyAsEnvVar(types.NodeClientAPIHost),
-		config.ServerAPIHost(),
+		config.ServerAPIHost(cfg),
 	))
 	envVarBuilder.WriteString(fmt.Sprintf(
 		"export %s=%d\n",
 		config.KeyAsEnvVar(types.NodeClientAPIPort),
-		config.ServerAPIPort(),
+		config.ServerAPIPort(cfg),
 	))
 
 	if nodeConfig.IsRequesterNode {
@@ -559,8 +560,8 @@ func pickP2pAddress(addresses []multiaddr.Multiaddr) multiaddr.Multiaddr {
 
 	return addresses[0]
 }
-func GetTLSCertificate(ctx context.Context, nodeConfig *node.NodeConfig) (string, string, error) {
-	cert, key := config.GetRequesterCertificateSettings()
+func GetTLSCertificate(ctx context.Context, cfg config.Context, nodeConfig *node.NodeConfig) (string, string, error) {
+	cert, key := config.GetRequesterCertificateSettings(cfg)
 	if cert != "" && key != "" {
 		return cert, key, nil
 	}
@@ -577,7 +578,7 @@ func GetTLSCertificate(ctx context.Context, nodeConfig *node.NodeConfig) (string
 	var err error
 	// If the user has not specified a private key, use their client key
 	if key == "" {
-		key, err = config.Get[string](types.UserKeyPath)
+		key, err = config.Get[string](cfg, types.UserKeyPath)
 		if err != nil {
 			return "", "", err
 		}

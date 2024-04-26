@@ -89,21 +89,21 @@ type NodeDependencyInjector struct {
 	AuthenticatorsFactory   AuthenticatorsFactory
 }
 
-func NewExecutorPluginNodeDependencyInjector() NodeDependencyInjector {
+func NewExecutorPluginNodeDependencyInjector(c pkgconfig.Context) NodeDependencyInjector {
 	return NodeDependencyInjector{
-		StorageProvidersFactory: NewStandardStorageProvidersFactory(),
-		ExecutorsFactory:        NewPluginExecutorFactory(),
-		PublishersFactory:       NewStandardPublishersFactory(),
-		AuthenticatorsFactory:   NewStandardAuthenticatorsFactory(),
+		StorageProvidersFactory: NewStandardStorageProvidersFactory(c),
+		ExecutorsFactory:        NewPluginExecutorFactory(c),
+		PublishersFactory:       NewStandardPublishersFactory(c),
+		AuthenticatorsFactory:   NewStandardAuthenticatorsFactory(c),
 	}
 }
 
-func NewStandardNodeDependencyInjector() NodeDependencyInjector {
+func NewStandardNodeDependencyInjector(c pkgconfig.Context) NodeDependencyInjector {
 	return NodeDependencyInjector{
-		StorageProvidersFactory: NewStandardStorageProvidersFactory(),
-		ExecutorsFactory:        NewStandardExecutorsFactory(),
-		PublishersFactory:       NewStandardPublishersFactory(),
-		AuthenticatorsFactory:   NewStandardAuthenticatorsFactory(),
+		StorageProvidersFactory: NewStandardStorageProvidersFactory(c),
+		ExecutorsFactory:        NewStandardExecutorsFactory(c),
+		PublishersFactory:       NewStandardPublishersFactory(c),
+		AuthenticatorsFactory:   NewStandardAuthenticatorsFactory(c),
 	}
 }
 
@@ -125,7 +125,9 @@ func (n *Node) Start(ctx context.Context) error {
 //nolint:funlen,gocyclo // Should be simplified when moving to FX
 func NewNode(
 	ctx context.Context,
-	config NodeConfig) (*Node, error) {
+	cfg pkgconfig.Context,
+	config NodeConfig,
+) (*Node, error) {
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -134,7 +136,7 @@ func NewNode(
 		}
 	}()
 
-	config.DependencyInjector = mergeDependencyInjectors(config.DependencyInjector, NewStandardNodeDependencyInjector())
+	config.DependencyInjector = mergeDependencyInjectors(config.DependencyInjector, NewStandardNodeDependencyInjector(cfg))
 	err = mergo.Merge(&config.APIServerConfig, publicapi.DefaultConfig())
 	if err != nil {
 		return nil, err
@@ -159,7 +161,7 @@ func NewNode(
 		return nil, err
 	}
 
-	signingKey, err := pkgconfig.GetClientPublicKey()
+	signingKey, err := pkgconfig.GetClientPublicKey(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +269,7 @@ func NewNode(
 			ReconnectDelay: config.NetworkConfig.ReconnectDelay,
 			CleanupManager: config.CleanupManager,
 		}
-		transportLayer, err = libp2p_transport.NewLibp2pTransport(ctx, libp2pConfig, tracingInfoStore)
+		transportLayer, err = libp2p_transport.NewLibp2pTransport(ctx, libp2pConfig, tracingInfoStore, cfg)
 		if err = transportLayer.RegisterNodeInfoConsumer(ctx, tracingInfoStore); err != nil {
 			return nil, pkgerrors.Wrap(err, "failed to register node info consumer with libp2p transport")
 		}
@@ -324,6 +326,7 @@ func NewNode(
 			ctx,
 			config.NodeID,
 			apiServer,
+			cfg,
 			config.RequesterNodeConfig,
 			storageProviders,
 			authenticators,
@@ -357,7 +360,7 @@ func NewNode(
 	}
 
 	if config.IsComputeNode {
-		storagePath := pkgconfig.GetStoragePath()
+		storagePath := pkgconfig.GetStoragePath(cfg)
 
 		publishers, err := config.DependencyInjector.PublishersFactory.Get(ctx, config)
 		if err != nil {
@@ -399,6 +402,7 @@ func NewNode(
 		// setup compute node
 		computeNode, err = NewComputeNode(
 			ctx,
+			cfg,
 			config.NodeID,
 			config.CleanupManager,
 			apiServer,
@@ -484,6 +488,7 @@ func NewNode(
 	updateCheckCtx, stopUpdateChecks := context.WithCancel(ctx)
 	version.RunUpdateChecker(
 		updateCheckCtx,
+		cfg,
 		func(ctx context.Context) (*models.BuildVersionInfo, error) { return nil, nil },
 		version.LogUpdateResponse,
 	)

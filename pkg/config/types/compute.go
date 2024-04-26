@@ -16,6 +16,9 @@ type ComputeConfig struct {
 	LogStreamConfig      LogStreamConfig           `yaml:"LogStream"`
 	LocalPublisher       LocalPublisherConfig      `yaml:"LocalPublisher"`
 	ControlPlaneSettings ComputeControlPlaneConfig `yaml:"ClusterTimeouts"`
+	// TODO(forrest) [refactor]: reconcile this path with the ComputeStoragePath in the parent struct NodeConfig
+	// this is compute_store
+	DataPath string `yaml:"DataPath"`
 }
 
 type CapacityConfig struct {

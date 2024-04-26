@@ -100,6 +100,7 @@ const NodeComputeControlPlaneSettingsInfoUpdateFrequency = "Node.Compute.Control
 const NodeComputeControlPlaneSettingsResourceUpdateFrequency = "Node.Compute.ControlPlaneSettings.ResourceUpdateFrequency"
 const NodeComputeControlPlaneSettingsHeartbeatFrequency = "Node.Compute.ControlPlaneSettings.HeartbeatFrequency"
 const NodeComputeControlPlaneSettingsHeartbeatTopic = "Node.Compute.ControlPlaneSettings.HeartbeatTopic"
+const NodeComputeDataPath = "Node.Compute.DataPath"
 const NodeRequester = "Node.Requester"
 const NodeRequesterJobDefaults = "Node.Requester.JobDefaults"
 const NodeRequesterJobDefaultsExecutionTimeout = "Node.Requester.JobDefaults.ExecutionTimeout"

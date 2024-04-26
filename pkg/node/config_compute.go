@@ -14,6 +14,7 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/bidstrategy/semantic"
 	"github.com/bacalhau-project/bacalhau/pkg/compute/capacity"
 	"github.com/bacalhau-project/bacalhau/pkg/compute/store"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
@@ -125,32 +126,33 @@ type ComputeConfig struct {
 	ControlPlaneSettings types.ComputeControlPlaneConfig
 }
 
-func NewComputeConfigWithDefaults() (ComputeConfig, error) {
-	return NewComputeConfigWith(DefaultComputeConfig)
+func NewComputeConfigWithDefaults(c config.Context) (ComputeConfig, error) {
+	return NewComputeConfigWith(c, NewDefaultComputeParam(c))
 }
 
-func NewComputeConfigWith(params ComputeConfigParams) (ComputeConfig, error) {
+func NewComputeConfigWith(c config.Context, params ComputeConfigParams) (ComputeConfig, error) {
+	defaults := NewDefaultComputeParam(c)
 	if params.JobNegotiationTimeout == 0 {
-		params.JobNegotiationTimeout = DefaultComputeConfig.JobNegotiationTimeout
+		params.JobNegotiationTimeout = defaults.JobNegotiationTimeout
 	}
 	if params.MinJobExecutionTimeout == 0 {
-		params.MinJobExecutionTimeout = DefaultComputeConfig.MinJobExecutionTimeout
+		params.MinJobExecutionTimeout = defaults.MinJobExecutionTimeout
 	}
 	if params.MaxJobExecutionTimeout == 0 {
-		params.MaxJobExecutionTimeout = DefaultComputeConfig.MaxJobExecutionTimeout
+		params.MaxJobExecutionTimeout = defaults.MaxJobExecutionTimeout
 	}
 	if params.DefaultJobExecutionTimeout == 0 {
-		params.DefaultJobExecutionTimeout = DefaultComputeConfig.DefaultJobExecutionTimeout
+		params.DefaultJobExecutionTimeout = defaults.DefaultJobExecutionTimeout
 	}
 	if params.LogRunningExecutionsInterval == 0 {
-		params.LogRunningExecutionsInterval = DefaultComputeConfig.LogRunningExecutionsInterval
+		params.LogRunningExecutionsInterval = defaults.LogRunningExecutionsInterval
 	}
 
 	if params.LocalPublisher.Address == "" {
-		params.LocalPublisher.Address = DefaultComputeConfig.LocalPublisher.Address
+		params.LocalPublisher.Address = defaults.LocalPublisher.Address
 	}
 	if params.LocalPublisher.Directory == "" {
-		params.LocalPublisher.Directory = DefaultComputeConfig.LocalPublisher.Directory
+		params.LocalPublisher.Directory = defaults.LocalPublisher.Directory
 		if err := os.MkdirAll(params.LocalPublisher.Directory, localPublishFolderPerm); err != nil {
 			return ComputeConfig{}, pkgerrors.Wrap(err, "creating default local publisher directory")
 		}
@@ -158,22 +160,22 @@ func NewComputeConfigWith(params ComputeConfigParams) (ComputeConfig, error) {
 
 	// Control plan settings defaults
 	if params.ControlPlaneSettings.HeartbeatFrequency == 0 {
-		params.ControlPlaneSettings.HeartbeatFrequency = DefaultComputeConfig.ControlPlaneSettings.HeartbeatFrequency
+		params.ControlPlaneSettings.HeartbeatFrequency = defaults.ControlPlaneSettings.HeartbeatFrequency
 	}
 	if params.ControlPlaneSettings.InfoUpdateFrequency == 0 {
-		params.ControlPlaneSettings.InfoUpdateFrequency = DefaultComputeConfig.ControlPlaneSettings.InfoUpdateFrequency
+		params.ControlPlaneSettings.InfoUpdateFrequency = defaults.ControlPlaneSettings.InfoUpdateFrequency
 	}
 	if params.ControlPlaneSettings.ResourceUpdateFrequency == 0 {
-		params.ControlPlaneSettings.ResourceUpdateFrequency = DefaultComputeConfig.ControlPlaneSettings.ResourceUpdateFrequency
+		params.ControlPlaneSettings.ResourceUpdateFrequency = defaults.ControlPlaneSettings.ResourceUpdateFrequency
 	}
 	if params.ControlPlaneSettings.HeartbeatTopic == "" {
-		params.ControlPlaneSettings.HeartbeatTopic = DefaultComputeConfig.ControlPlaneSettings.HeartbeatTopic
+		params.ControlPlaneSettings.HeartbeatTopic = defaults.ControlPlaneSettings.HeartbeatTopic
 	}
 
 	// Get available physical resources in the host
 	physicalResourcesProvider := params.PhysicalResourcesProvider
 	if physicalResourcesProvider == nil {
-		physicalResourcesProvider = DefaultComputeConfig.PhysicalResourcesProvider
+		physicalResourcesProvider = defaults.PhysicalResourcesProvider
 	}
 	physicalResources, err := physicalResourcesProvider.GetAvailableCapacity(context.Background())
 	if err != nil {
@@ -181,12 +183,12 @@ func NewComputeConfigWith(params ComputeConfigParams) (ComputeConfig, error) {
 	}
 	// populate total resource limits with default values and physical resources if not set
 	totalResourceLimits := params.TotalResourceLimits.
-		Merge(DefaultComputeConfig.TotalResourceLimits).
+		Merge(defaults.TotalResourceLimits).
 		Merge(physicalResources)
 
 	// populate job resource limits with default values and total resource limits if not set
 	jobResourceLimits := params.JobResourceLimits.
-		Merge(DefaultComputeConfig.JobResourceLimits).
+		Merge(defaults.JobResourceLimits).
 		Merge(*totalResourceLimits)
 
 	// by default set the queue size to the total resource limits, which allows the node overcommit to double of the total resource limits.
@@ -197,7 +199,7 @@ func NewComputeConfigWith(params ComputeConfigParams) (ComputeConfig, error) {
 
 	// populate default job resource limits with default values and job resource limits if not set
 	defaultJobResourceLimits := params.DefaultJobResourceLimits.
-		Merge(DefaultComputeConfig.DefaultJobResourceLimits)
+		Merge(defaults.DefaultJobResourceLimits)
 
 	config := ComputeConfig{
 		TotalResourceLimits:          *totalResourceLimits,

@@ -46,14 +46,13 @@ type (
 )
 
 // Standard implementations used in prod and when testing prod behavior
-func NewStandardStorageProvidersFactory() StorageProvidersFactory {
+func NewStandardStorageProvidersFactory(c config.Context) StorageProvidersFactory {
 	return StorageProvidersFactoryFunc(func(
 		ctx context.Context,
 		nodeConfig NodeConfig,
 	) (storage.StorageProvider, error) {
 		pr, err := executor_util.NewStandardStorageProvider(
-			ctx,
-			nodeConfig.CleanupManager,
+			c,
 			executor_util.StandardStorageProviderOptions{
 				API:                   nodeConfig.IPFSClient,
 				AllowListedLocalPaths: nodeConfig.AllowListedLocalPaths,
@@ -66,12 +65,11 @@ func NewStandardStorageProvidersFactory() StorageProvidersFactory {
 	})
 }
 
-func NewStandardExecutorsFactory() ExecutorsFactory {
+func NewStandardExecutorsFactory(c config.Context) ExecutorsFactory {
 	return ExecutorsFactoryFunc(
 		func(ctx context.Context, nodeConfig NodeConfig) (executor.ExecutorProvider, error) {
 			pr, err := executor_util.NewStandardExecutorProvider(
-				ctx,
-				nodeConfig.CleanupManager,
+				c,
 				executor_util.StandardExecutorOptions{
 					DockerID: fmt.Sprintf("bacalhau-%s", nodeConfig.NodeID),
 				},
@@ -83,7 +81,7 @@ func NewStandardExecutorsFactory() ExecutorsFactory {
 		})
 }
 
-func NewPluginExecutorFactory() ExecutorsFactory {
+func NewPluginExecutorFactory(c config.Context) ExecutorsFactory {
 	return ExecutorsFactoryFunc(
 		func(ctx context.Context, nodeConfig NodeConfig) (executor.ExecutorProvider, error) {
 			pr, err := executor_util.NewPluginExecutorProvider(
@@ -93,7 +91,7 @@ func NewPluginExecutorFactory() ExecutorsFactory {
 					Plugins: []executor_util.PluginExecutorManagerConfig{
 						{
 							Name:             models.EngineDocker,
-							Path:             config.GetExecutorPluginsPath(),
+							Path:             config.GetExecutorPluginsPath(c),
 							Command:          "bacalhau-docker-executor",
 							ProtocolVersion:  1,
 							MagicCookieKey:   "EXECUTOR_PLUGIN",
@@ -101,7 +99,7 @@ func NewPluginExecutorFactory() ExecutorsFactory {
 						},
 						{
 							Name:             models.EngineWasm,
-							Path:             config.GetExecutorPluginsPath(),
+							Path:             config.GetExecutorPluginsPath(c),
 							Command:          "bacalhau-wasm-executor",
 							ProtocolVersion:  1,
 							MagicCookieKey:   "EXECUTOR_PLUGIN",
@@ -116,13 +114,14 @@ func NewPluginExecutorFactory() ExecutorsFactory {
 		})
 }
 
-func NewStandardPublishersFactory() PublishersFactory {
+func NewStandardPublishersFactory(c config.Context) PublishersFactory {
 	return PublishersFactoryFunc(
 		func(
 			ctx context.Context,
 			nodeConfig NodeConfig) (publisher.PublisherProvider, error) {
 			pr, err := publisher_util.NewPublisherProvider(
 				ctx,
+				c,
 				nodeConfig.CleanupManager,
 				nodeConfig.IPFSClient,
 				&nodeConfig.ComputeConfig.LocalPublisher,
@@ -134,11 +133,11 @@ func NewStandardPublishersFactory() PublishersFactory {
 		})
 }
 
-func NewStandardAuthenticatorsFactory() AuthenticatorsFactory {
+func NewStandardAuthenticatorsFactory(c config.Context) AuthenticatorsFactory {
 	return AuthenticatorsFactoryFunc(
 		func(ctx context.Context, nodeConfig NodeConfig) (authn.Provider, error) {
 			var allErr error
-			privKey, allErr := config.GetClientPrivateKey()
+			privKey, allErr := config.GetClientPrivateKey(c)
 			if allErr != nil {
 				return nil, allErr
 			}

@@ -16,6 +16,7 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/compute/sensors"
 	"github.com/bacalhau-project/bacalhau/pkg/compute/store"
 	pkgconfig "github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/executor"
 	executor_util "github.com/bacalhau-project/bacalhau/pkg/executor/util"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
@@ -48,6 +49,7 @@ type Compute struct {
 //nolint:funlen
 func NewComputeNode(
 	ctx context.Context,
+	cfg pkgconfig.Context,
 	nodeID string,
 	cleanupManager *system.CleanupManager,
 	apiServer *publicapi.Server,
@@ -197,9 +199,9 @@ func NewComputeNode(
 	if managementProxy != nil {
 		// TODO: Make the registration lock folder a config option so that we have it
 		// available and don't have to depend on getting the repo folder.
-		repo, _ := pkgconfig.Get[string]("repo")
+		computeDataPath, _ := pkgconfig.Get[string](cfg, types.NodeComputeDataPath)
 		regFilename := fmt.Sprintf("%s.registration.lock", nodeID)
-		regFilename = filepath.Join(repo, pkgconfig.ComputeStorePath, regFilename)
+		regFilename = filepath.Join(computeDataPath, regFilename)
 
 		// Set up the management client which will attempt to register this node
 		// with the requester node, and then if successful will send regular node

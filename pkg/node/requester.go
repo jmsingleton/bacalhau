@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/bacalhau-project/bacalhau/pkg/authn"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/job"
 	"github.com/bacalhau-project/bacalhau/pkg/lib/backoff"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
@@ -56,6 +57,7 @@ func NewRequesterNode(
 	ctx context.Context,
 	nodeID string,
 	apiServer *publicapi.Server,
+	cfg config.Context,
 	requesterConfig RequesterConfig,
 	storageProvider storage.StorageProvider,
 	authnProvider authn.Provider,
@@ -281,7 +283,7 @@ func NewRequesterNode(
 
 	// Register event handlers
 	lifecycleEventHandler := system.NewJobLifecycleEventHandler(nodeID)
-	eventTracer, err := eventhandler.NewTracer()
+	eventTracer, err := eventhandler.NewTracer(cfg)
 	if err != nil {
 		return nil, err
 	}

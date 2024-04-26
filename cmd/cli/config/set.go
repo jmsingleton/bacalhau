@@ -19,9 +19,10 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
+	"github.com/bacalhau-project/bacalhau/pkg/setup"
 )
 
-func newSetCmd() *cobra.Command {
+func newSetCmd(cfg config.Context) *cobra.Command {
 	showCmd := &cobra.Command{
 		Use:      "set",
 		Args:     cobra.MinimumNArgs(2),
@@ -29,7 +30,16 @@ func newSetCmd() *cobra.Command {
 		PreRunE:  hook.ClientPreRunHooks,
 		PostRunE: hook.ClientPostRunHooks,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return setConfig(args[0], args[1:]...)
+			// create or open a repo
+			repoPath, err := cfg.RepoPath()
+			if err != nil {
+				return err
+			}
+			_, err = setup.SetupBacalhauRepo(repoPath, cfg)
+			if err != nil {
+				return err
+			}
+			return setConfig(cfg, args[0], args[1:]...)
 		},
 	}
 	return showCmd
@@ -37,15 +47,15 @@ func newSetCmd() *cobra.Command {
 
 func currentValue(key string) (interface{}, error) {
 	// get the default viper schema
-	viperSchema := NewViperWithDefaultConfig(config.ForEnvironment())
 	// get a list of all valid configuration keys, same list as returned by `config list`
-	liveKeys := viperSchema.AllKeys()
-	if !slices.Contains(liveKeys, key) {
+	scheam := config.New().User()
+	configKeys := scheam.AllKeys()
+	if !slices.Contains(configKeys, key) {
 		return nil, fmt.Errorf("invalid configuration key %q: not found", key)
 	}
 
 	// calling `Get` on this instance will return a default value from the config structure that we can type assert on.
-	return viperSchema.Get(key), nil
+	return scheam.Get(key), nil
 }
 
 func getWriter(configFile string) (*viper.Viper, error) {
@@ -61,7 +71,7 @@ func getWriter(configFile string) (*viper.Viper, error) {
 	return viperWriter, nil
 }
 
-func setConfig(key string, values ...string) error {
+func setConfig(c config.Context, key string, values ...string) error {
 	// remove all spaces and make lowercase
 	key = sanitizeKey(key)
 
@@ -78,7 +88,7 @@ func setConfig(key string, values ...string) error {
 	}
 
 	// there may me a config file present, we'll write to that if it exists.
-	configFile := viper.ConfigFileUsed()
+	configFile := c.User().ConfigFileUsed()
 	if configFile == "" {
 		// if there isn't a config file, we'll assume we add it to the current repo.
 		configFile = filepath.Join(viper.GetString("repo"), "config.yaml")

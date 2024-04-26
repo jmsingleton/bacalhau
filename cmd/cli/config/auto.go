@@ -12,8 +12,10 @@ import (
 
 	"github.com/bacalhau-project/bacalhau/cmd/util/hook"
 	"github.com/bacalhau-project/bacalhau/pkg/compute/capacity/system"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
+	"github.com/bacalhau-project/bacalhau/pkg/setup"
 )
 
 const (
@@ -89,7 +91,8 @@ func (a *autoSettings) validate() error {
 	return nil
 }
 
-func newAutoResourceCmd() *cobra.Command {
+// TODO(forrest) [fixme]
+func newAutoResourceCmd(cfg config.Context) *cobra.Command {
 	settings := new(autoSettings)
 	autoCmd := &cobra.Command{
 		Use:      "auto-resources [flags]",
@@ -101,7 +104,16 @@ func newAutoResourceCmd() *cobra.Command {
 			if err := settings.validate(); err != nil {
 				return err
 			}
-			return autoConfig(cmd.Context(), settings)
+			// create or open a repo
+			repoPath, err := cfg.RepoPath()
+			if err != nil {
+				return err
+			}
+			_, err = setup.SetupBacalhauRepo(repoPath, cfg)
+			if err != nil {
+				return err
+			}
+			return autoConfig(cmd.Context(), cfg, settings)
 		},
 	}
 
@@ -110,44 +122,44 @@ func newAutoResourceCmd() *cobra.Command {
 	return autoCmd
 }
 
-func autoConfig(ctx context.Context, settings *autoSettings) error {
-	pp := system.NewPhysicalCapacityProvider()
+func autoConfig(ctx context.Context, c config.Context, settings *autoSettings) error {
+	pp := system.NewPhysicalCapacityProvider(c)
 	physicalResources, err := pp.GetTotalCapacity(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to calculate system physical resources: %w", err)
 	}
 
-	if err := setResources(types.NodeComputeCapacityTotalResourceLimits, settings.TotalPercentage, physicalResources); err != nil {
+	if err := setResources(c, types.NodeComputeCapacityTotalResourceLimits, settings.TotalPercentage, physicalResources); err != nil {
 		return err
 	}
-	if err := setResources(types.NodeComputeCapacityJobResourceLimits, settings.JobPercentage, physicalResources); err != nil {
+	if err := setResources(c, types.NodeComputeCapacityJobResourceLimits, settings.JobPercentage, physicalResources); err != nil {
 		return err
 	}
-	if err := setResources(types.NodeComputeCapacityDefaultJobResourceLimits, settings.DefaultPercentage, physicalResources); err != nil {
+	if err := setResources(c, types.NodeComputeCapacityDefaultJobResourceLimits, settings.DefaultPercentage, physicalResources); err != nil {
 		return err
 	}
-	if err := setResources(types.NodeComputeCapacityQueueResourceLimits, settings.QueuePercentage, physicalResources); err != nil {
+	if err := setResources(c, types.NodeComputeCapacityQueueResourceLimits, settings.QueuePercentage, physicalResources); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func setResources(key string, percentageValue int, resources models.Resources) error {
+func setResources(c config.Context, key string, percentageValue int, resources models.Resources) error {
 	percentage := float64(percentageValue) * .01
-	if err := setConfig(fmt.Sprintf("%s.CPU", key), k8sresource.NewCPUFromFloat(resources.CPU*percentage).ToString()); err != nil {
+	if err := setConfig(c, fmt.Sprintf("%s.CPU", key), k8sresource.NewCPUFromFloat(resources.CPU*percentage).ToString()); err != nil {
 		return err
 	}
-	if err := setConfig(fmt.Sprintf("%s.Memory", key), humanize.Bytes(uint64(float64(resources.Memory)*percentage))); err != nil {
+	if err := setConfig(c, fmt.Sprintf("%s.Memory", key), humanize.Bytes(uint64(float64(resources.Memory)*percentage))); err != nil {
 		return err
 	}
-	if err := setConfig(fmt.Sprintf("%s.Disk", key), humanize.Bytes(uint64(float64(resources.Disk)*percentage))); err != nil {
+	if err := setConfig(c, fmt.Sprintf("%s.Disk", key), humanize.Bytes(uint64(float64(resources.Disk)*percentage))); err != nil {
 		return err
 	}
 	// NB(forrest): we use an int64 to represent number of GPUs on a system, max value is roughly nine quintillion
 	// we are downcasting it to an int with a max value of ~two billion, if there are ever this many GPUs let us
 	// celebrate the panic this will cause.
-	if err := setConfig(fmt.Sprintf("%s.GPU", key), strconv.Itoa(int(resources.GPU))); err != nil {
+	if err := setConfig(c, fmt.Sprintf("%s.GPU", key), strconv.Itoa(int(resources.GPU))); err != nil {
 		return err
 	}
 	return nil

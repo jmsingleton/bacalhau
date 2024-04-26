@@ -10,7 +10,6 @@ import (
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
-	"github.com/spf13/viper"
 
 	"github.com/bacalhau-project/bacalhau/pkg/compute/store"
 	"github.com/bacalhau-project/bacalhau/pkg/compute/store/boltdb"
@@ -30,9 +29,9 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/system"
 )
 
-func GetComputeConfig(ctx context.Context, createExecutionStore bool) (node.ComputeConfig, error) {
+func GetComputeConfig(ctx context.Context, c config.Context, createExecutionStore bool) (node.ComputeConfig, error) {
 	var cfg types.ComputeConfig
-	if err := config.ForKey(types.NodeCompute, &cfg); err != nil {
+	if err := c.ForKey(types.NodeCompute, &cfg); err != nil {
 		return node.ComputeConfig{}, err
 	}
 
@@ -54,7 +53,7 @@ func GetComputeConfig(ctx context.Context, createExecutionStore bool) (node.Comp
 		}
 	}
 
-	return node.NewComputeConfigWith(node.ComputeConfigParams{
+	return node.NewComputeConfigWith(c, node.ComputeConfigParams{
 		TotalResourceLimits:                   *totalResources,
 		QueueResourceLimits:                   *queueResources,
 		JobResourceLimits:                     *jobResources,
@@ -79,9 +78,9 @@ func GetComputeConfig(ctx context.Context, createExecutionStore bool) (node.Comp
 	})
 }
 
-func GetRequesterConfig(ctx context.Context, createJobStore bool) (node.RequesterConfig, error) {
+func GetRequesterConfig(ctx context.Context, c config.Context, createJobStore bool) (node.RequesterConfig, error) {
 	var cfg types.RequesterConfig
-	if err := config.ForKey(types.NodeRequester, &cfg); err != nil {
+	if err := c.ForKey(types.NodeRequester, &cfg); err != nil {
 		return node.RequesterConfig{}, err
 	}
 
@@ -136,12 +135,15 @@ func GetRequesterConfig(ctx context.Context, createJobStore bool) (node.Requeste
 	return requesterConfig, nil
 }
 
-func getNodeType() (requester, compute bool, err error) {
+func getNodeType(c config.Context) (requester, compute bool, err error) {
 	requester = false
 	compute = false
 	err = nil
 
-	nodeType := viper.GetStringSlice(types.NodeType)
+	var nodeType []string
+	if err := c.ForKey(types.NodeType, &nodeType); err != nil {
+		return false, false, err
+	}
 	for _, nodeType := range nodeType {
 		if nodeType == "compute" {
 			compute = true
@@ -154,9 +156,9 @@ func getNodeType() (requester, compute bool, err error) {
 	return
 }
 
-func getIPFSConfig() (types.IpfsConfig, error) {
+func getIPFSConfig(c config.Context) (types.IpfsConfig, error) {
 	var ipfsConfig types.IpfsConfig
-	if err := config.ForKey(types.NodeIPFS, &ipfsConfig); err != nil {
+	if err := c.ForKey(types.NodeIPFS, &ipfsConfig); err != nil {
 		return types.IpfsConfig{}, err
 	}
 	if ipfsConfig.Connect != "" && ipfsConfig.PrivateInternal {
@@ -207,21 +209,21 @@ func SetupIPFSClient(ctx context.Context, cm *system.CleanupManager, ipfsCfg typ
 	return client, nil
 }
 
-func getAllowListedLocalPathsConfig() []string {
-	return viper.GetStringSlice(types.NodeAllowListedLocalPaths)
+func getAllowListedLocalPathsConfig(c config.Context) ([]string, error) {
+	return config.Get[[]string](c, types.NodeAllowListedLocalPaths)
 }
 
-func getTransportType() (string, error) {
+func getTransportType(c config.Context) (string, error) {
 	var networkCfg types.NetworkConfig
-	if err := config.ForKey(types.NodeNetwork, &networkCfg); err != nil {
+	if err := c.ForKey(types.NodeNetwork, &networkCfg); err != nil {
 		return "", err
 	}
 	return networkCfg.Type, nil
 }
 
-func getNetworkConfig() (node.NetworkConfig, error) {
+func getNetworkConfig(c config.Context) (node.NetworkConfig, error) {
 	var networkCfg types.NetworkConfig
-	if err := config.ForKey(types.NodeNetwork, &networkCfg); err != nil {
+	if err := c.ForKey(types.NodeNetwork, &networkCfg); err != nil {
 		return node.NetworkConfig{}, err
 	}
 
@@ -266,8 +268,8 @@ func getJobStore(ctx context.Context, storeCfg types.JobStoreConfig) (jobstore.S
 	}
 }
 
-func getNodeID(ctx context.Context) (string, error) {
-	nodeName, err := config.Get[string](types.NodeName)
+func getNodeID(ctx context.Context, c config.Context) (string, error) {
+	nodeName, err := config.Get[string](c, types.NodeName)
 	if err != nil {
 		return "", err
 	}
@@ -275,7 +277,7 @@ func getNodeID(ctx context.Context) (string, error) {
 	if nodeName != "" {
 		return nodeName, nil
 	}
-	nodeNameProviderType, err := config.Get[string](types.NodeNameProvider)
+	nodeNameProviderType, err := config.Get[string](c, types.NodeNameProvider)
 	if err != nil {
 		return "", err
 	}
@@ -299,7 +301,7 @@ func getNodeID(ctx context.Context) (string, error) {
 	}
 
 	// set the new name in the config, so it can be used and persisted later.
-	config.SetValue(types.NodeName, nodeName)
+	c.Set(types.NodeName, nodeName)
 	return nodeName, nil
 }
 
@@ -307,12 +309,12 @@ func getNodeID(ctx context.Context) (string, error) {
 // this will only write values that must not change between invocations,
 // such as the job store path and node name,
 // and only if they are not already set in the config file.
-func persistConfigs(repoPath string) error {
-	resolvedConfig, err := config.GetConfig()
+func persistConfigs(repoPath string, c config.Context) error {
+	resolvedConfig, err := c.Current()
 	if err != nil {
 		return fmt.Errorf("error getting config: %w", err)
 	}
-	err = config.WritePersistedConfigs(filepath.Join(repoPath, config.ConfigFileName), *resolvedConfig)
+	err = config.WritePersistedConfigs(filepath.Join(repoPath, config.FileName), resolvedConfig)
 	if err != nil {
 		return fmt.Errorf("error writing persisted config: %w", err)
 	}

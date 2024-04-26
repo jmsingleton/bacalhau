@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
 	"github.com/bacalhau-project/bacalhau/pkg/node"
 	"github.com/bacalhau-project/bacalhau/pkg/routing"
@@ -14,8 +15,8 @@ import (
 
 type ConfigOption = func(cfg *DevStackConfig)
 
-func defaultDevStackConfig() (*DevStackConfig, error) {
-	computeConfig, err := node.NewComputeConfigWithDefaults()
+func defaultDevStackConfig(cfg config.Context) (*DevStackConfig, error) {
+	computeConfig, err := node.NewComputeConfigWithDefaults(cfg)
 	if err != nil {
 		return nil, err
 	}

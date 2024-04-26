@@ -52,11 +52,12 @@ type Executor struct {
 	activeFlags map[string]chan struct{}
 	complete    map[string]chan struct{}
 	client      *docker.Client
+	cfg         config.Context
 }
 
 func NewExecutor(
-	_ context.Context,
 	id string,
+	cfg config.Context,
 ) (*Executor, error) {
 	dockerClient, err := docker.NewDockerClient()
 	if err != nil {
@@ -68,6 +69,7 @@ func NewExecutor(
 		client:      dockerClient,
 		activeFlags: make(map[string]chan struct{}),
 		complete:    make(map[string]chan struct{}),
+		cfg:         cfg,
 	}
 
 	return de, nil
@@ -97,7 +99,7 @@ func (e *Executor) ShouldBid(
 	ctx context.Context,
 	request bidstrategy.BidStrategyRequest,
 ) (bidstrategy.BidStrategyResponse, error) {
-	return semantic.NewImagePlatformBidStrategy(e.client).ShouldBid(ctx, request)
+	return semantic.NewImagePlatformBidStrategy(e.client, e.cfg).ShouldBid(ctx, request)
 }
 
 func (e *Executor) ShouldBidBasedOnUsage(
