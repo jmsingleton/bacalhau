@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/downloader"
 	"github.com/bacalhau-project/bacalhau/pkg/downloader/util"
 	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels"
@@ -16,8 +17,11 @@ import (
 )
 
 // This test submits a job that uses the Docker executor with an IPFS input.
-func SubmitDockerIPFSJobAndGet(ctx context.Context) error {
-	client := getClient()
+func SubmitDockerIPFSJobAndGet(ctx context.Context, cfg config.Context) error {
+	client, err := getClient(cfg)
+	if err != nil {
+		return err
+	}
 
 	cm := system.NewCleanupManager()
 	j, err := getSampleDockerIPFSJob()
@@ -43,14 +47,14 @@ func SubmitDockerIPFSJobAndGet(ctx context.Context) error {
 
 	err = waitUntilCompleted(ctx, client, submittedJob)
 	if err != nil {
-		return fmt.Errorf("waiting until completed: %s", err)
+		return fmt.Errorf("waiting until completed: %w", err)
 	}
 
-	results, err := getClientV2().Jobs().Results(ctx, &apimodels.ListJobResultsRequest{
+	results, err := getClientV2(cfg).Jobs().Results(ctx, &apimodels.ListJobResultsRequest{
 		JobID: submittedJob.Metadata.ID,
 	})
 	if err != nil {
-		return fmt.Errorf("getting results: %s", err)
+		return fmt.Errorf("getting results: %w", err)
 	}
 
 	if len(results.Results) == 0 {
@@ -59,31 +63,27 @@ func SubmitDockerIPFSJobAndGet(ctx context.Context) error {
 
 	outputDir, err := os.MkdirTemp(os.TempDir(), "submitAndGet")
 	if err != nil {
-		return fmt.Errorf("making temporary dir: %s", err)
+		return fmt.Errorf("making temporary dir: %w", err)
 	}
 	defer os.RemoveAll(outputDir)
 
 	downloadSettings, err := getIPFSDownloadSettings()
 	if err != nil {
-		return fmt.Errorf("getting download settings: %s", err)
+		return fmt.Errorf("getting download settings: %w", err)
 	}
 	downloadSettings.OutputDir = outputDir
 	// canary is running every 5 minutes with a 5 minutes timeout. It should be safe to allow the download to take up to 4 minutes and leave
 	// 1 minute for the rest of the test
 	downloadSettings.Timeout = 240 * time.Second
 
-	downloaderProvider := util.NewStandardDownloaders(cm)
-	if err != nil {
-		return err
-	}
+	downloaderProvider := util.NewStandardDownloaders(cm, cfg)
 
-	err = downloader.DownloadResults(ctx, results.Results, downloaderProvider, downloadSettings)
-	if err != nil {
-		return fmt.Errorf("downloading job: %s", err)
+	if err := downloader.DownloadResults(ctx, results.Results, downloaderProvider, downloadSettings); err != nil {
+		return fmt.Errorf("downloading job: %w", err)
 	}
 	files, err := os.ReadDir(filepath.Join(downloadSettings.OutputDir, j.Spec.Outputs[0].Name))
 	if err != nil {
-		return fmt.Errorf("reading results directory: %s", err)
+		return fmt.Errorf("reading results directory: %w", err)
 	}
 
 	for _, file := range files {
@@ -100,7 +100,7 @@ func SubmitDockerIPFSJobAndGet(ctx context.Context) error {
 	// Tests use the checksum of the data we uploaded in scenarios_test.go
 	err = compareOutput(body, expectedChecksum)
 	if err != nil {
-		return fmt.Errorf("testing md5 of input: %s", err)
+		return fmt.Errorf("testing md5 of input: %w", err)
 	}
 	body, err = os.ReadFile(filepath.Join(downloadSettings.OutputDir, j.Spec.Outputs[0].Name, "stat.txt"))
 	if err != nil {
@@ -109,7 +109,7 @@ func SubmitDockerIPFSJobAndGet(ctx context.Context) error {
 	// Tests use the stat of the data we uploaded in scenarios_test.go
 	err = compareOutput(body, expectedStat)
 	if err != nil {
-		return fmt.Errorf("testing ls of input: %s", err)
+		return fmt.Errorf("testing ls of input: %w", err)
 	}
 
 	return nil

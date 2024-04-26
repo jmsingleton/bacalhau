@@ -26,12 +26,12 @@ import (
 //   - only set values are added to the config.
 func TestAdditiveSet(t *testing.T) {
 	// this initializes the global viper configuration system
-	r := setup.SetupBacalhauRepoForTesting(t)
+	r, c := setup.SetupBacalhauRepoForTesting(t)
 	repoPath, err := r.Path()
 	require.NoError(t, err)
-	viper.Set("repo", repoPath)
+	c.System().Set("repo", repoPath)
 
-	err = setConfig("node.loggingmode", "json")
+	err = setConfig(c, "node.loggingmode", "json")
 	require.NoError(t, err)
 
 	expected := types.BacalhauConfig{Node: types.NodeConfig{LoggingMode: logger.LogModeJSON}}
@@ -39,7 +39,7 @@ func TestAdditiveSet(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 
-	err = setConfig("node.compute.executionstore.type", "boltdb")
+	err = setConfig(c, "node.compute.executionstore.type", "boltdb")
 	require.NoError(t, err)
 
 	expected = types.BacalhauConfig{Node: types.NodeConfig{
@@ -54,7 +54,7 @@ func TestAdditiveSet(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 
-	err = setConfig("node.compute.jobselection.locality", "anywhere")
+	err = setConfig(c, "node.compute.jobselection.locality", "anywhere")
 	require.NoError(t, err)
 
 	expected = types.BacalhauConfig{Node: types.NodeConfig{
@@ -72,7 +72,7 @@ func TestAdditiveSet(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 
-	err = setConfig("node.compute.jobtimeouts.jobnegotiationtimeout", "120s")
+	err = setConfig(c, "node.compute.jobtimeouts.jobnegotiationtimeout", "120s")
 	require.NoError(t, err)
 
 	expected = types.BacalhauConfig{Node: types.NodeConfig{
@@ -93,7 +93,7 @@ func TestAdditiveSet(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 
-	err = setConfig("node.labels", "foo=bar", "bar=buz", "buz=baz")
+	err = setConfig(c, "node.labels", "foo=bar", "bar=buz", "buz=baz")
 	require.NoError(t, err)
 
 	expected = types.BacalhauConfig{Node: types.NodeConfig{
@@ -119,7 +119,7 @@ func TestAdditiveSet(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 
-	err = setConfig("node.clientapi.host", "0.0.0.0")
+	err = setConfig(c, "node.clientapi.host", "0.0.0.0")
 	require.NoError(t, err)
 
 	expected = types.BacalhauConfig{Node: types.NodeConfig{
@@ -152,21 +152,21 @@ func TestAdditiveSet(t *testing.T) {
 
 func TestSetFailure(t *testing.T) {
 	// this initializes the global viper configuration system
-	r := setup.SetupBacalhauRepoForTesting(t)
+	r, c := setup.SetupBacalhauRepoForTesting(t)
 	repoPath, err := r.Path()
 	require.NoError(t, err)
 	viper.Set("repo", repoPath)
 
 	// fails as there are too many values, we expect 1
-	err = setConfig("node.loggingmode", "json", "jayson", "mayson", "grayson")
+	err = setConfig(c, "node.loggingmode", "json", "jayson", "mayson", "grayson")
 	require.Error(t, err)
 
 	// fails as baeson is not a valid type
-	err = setConfig("node.loggingmode", "baeson")
+	err = setConfig(c, "node.loggingmode", "baeson")
 	require.Error(t, err)
 
 	// fails as the key isn't a valid config key
-	err = setConfig("not.a.config.key", "porkchop sandwiches")
+	err = setConfig(c, "not.a.config.key", "porkchop sandwiches")
 	require.Error(t, err)
 }
 

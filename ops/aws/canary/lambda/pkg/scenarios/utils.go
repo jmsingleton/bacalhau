@@ -127,13 +127,13 @@ func compareOutput(output []byte, expectedOutput string) error {
 	return nil
 }
 
-func getClientHostAndPort() (string, uint16) {
-	host, err := config.Get[string](types.NodeClientAPIHost)
+func getClientHostAndPort(cfg config.Context) (string, uint16) {
+	host, err := config.Get[string](cfg, types.NodeClientAPIHost)
 	if err != nil {
 		panic(err)
 	}
 
-	port, err := config.Get[uint16](types.NodeClientAPIPort)
+	port, err := config.Get[uint16](cfg, types.NodeClientAPIPort)
 	if err != nil {
 		panic(err)
 	}
@@ -141,14 +141,14 @@ func getClientHostAndPort() (string, uint16) {
 	return host, port
 }
 
-func getClient() *client.APIClient {
-	legacyTLS := client.LegacyTLSSupport(config.ClientTLSConfig())
-	host, port := getClientHostAndPort()
-	return client.NewAPIClient(legacyTLS, host, port)
+func getClient(cfg config.Context) (*client.APIClient, error) {
+	legacyTLS := client.LegacyTLSSupport(config.ClientTLSConfig(cfg))
+	host, port := getClientHostAndPort(cfg)
+	return client.NewAPIClient(legacyTLS, cfg, host, port)
 }
 
-func getClientV2() clientv2.API {
-	host, port := getClientHostAndPort()
+func getClientV2(cfg config.Context) clientv2.API {
+	host, port := getClientHostAndPort(cfg)
 	return clientv2.New(fmt.Sprintf("http://%s:%d", host, port))
 }
 

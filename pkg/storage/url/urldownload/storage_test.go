@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/bacalhau-project/bacalhau/pkg/config"
@@ -30,8 +29,6 @@ type StorageSuite struct {
 }
 
 func TestStorageSuite(t *testing.T) {
-	err := config.Set(configenv.Local)
-	require.NoError(t, err)
 	suite.Run(t, new(StorageSuite))
 }
 
@@ -41,7 +38,8 @@ func (s *StorageSuite) SetupTest() {
 }
 
 func (s *StorageSuite) TestHasStorageLocally() {
-	sp := NewStorage()
+	c := config.New(config.WithDefaultConfig(configenv.Local))
+	sp := NewStorage(c)
 
 	spec := models.InputSource{
 		Source: &models.SpecConfig{
@@ -60,6 +58,7 @@ func (s *StorageSuite) TestHasStorageLocally() {
 }
 
 func (s *StorageSuite) TestPrepareStorageURL() {
+	c := config.New(config.WithDefaultConfig(configenv.Local))
 	type dummyRequest struct {
 		path    string
 		code    int
@@ -304,7 +303,7 @@ func (s *StorageSuite) TestPrepareStorageURL() {
 			}))
 			s.T().Cleanup(ts.Close)
 
-			subject := NewStorage()
+			subject := NewStorage(c)
 
 			url := fmt.Sprintf("%s%s", ts.URL, test.requests[0].path)
 			spec := models.InputSource{

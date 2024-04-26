@@ -44,9 +44,6 @@ func NewStandardStorageProvider(
 	}
 
 	urlDownloadStorage := urldownload.NewStorage(c)
-	if err != nil {
-		return nil, err
-	}
 
 	repoCloneStorage, err := repo.NewStorage(ipfsAPICopyStorage)
 	if err != nil {

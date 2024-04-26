@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/bacalhau-project/bacalhau/pkg/compute/store/boltdb"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 
 	"github.com/bacalhau-project/bacalhau/pkg/authz"
 	"github.com/bacalhau-project/bacalhau/pkg/compute"
@@ -31,6 +32,7 @@ import (
 type ComputeSuite struct {
 	suite.Suite
 	node             *node.Compute
+	c                config.Context
 	config           node.ComputeConfig
 	cm               *system.CleanupManager
 	executor         *noop_executor.NoopExecutor
@@ -48,10 +50,11 @@ func (s *ComputeSuite) SetupTest() {
 
 // setupConfig creates a new config for testing
 func (s *ComputeSuite) setupConfig() {
+	s.c = config.New()
 	executionStore, err := boltdb.NewStore(context.Background(), filepath.Join(s.T().TempDir(), "executions.db"))
 	s.Require().NoError(err)
 
-	cfg, err := node.NewComputeConfigWith(node.ComputeConfigParams{
+	cfg, err := node.NewComputeConfigWith(s.c, node.ComputeConfigParams{
 		TotalResourceLimits: models.Resources{
 			CPU: 2,
 		},
@@ -108,6 +111,7 @@ func (s *ComputeSuite) setupNode() {
 
 	s.node, err = node.NewComputeNode(
 		ctx,
+		s.c,
 		"test",
 		s.cm,
 		apiServer,

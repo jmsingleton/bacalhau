@@ -25,9 +25,10 @@ type Downloader struct {
 	cfg  config.Context
 }
 
-func NewIPFSDownloader(cm *system.CleanupManager) *Downloader {
+func NewIPFSDownloader(cm *system.CleanupManager, cfg config.Context) *Downloader {
 	return &Downloader{
-		cm: cm,
+		cm:  cm,
+		cfg: cfg,
 	}
 }
 

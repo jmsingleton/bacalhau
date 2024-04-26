@@ -33,9 +33,12 @@ var V2Migration = repo.NewMigration(
 		// use default values, args and env vars to fill in the config, so we can be sure we are
 		// reading the correct libp2p key in case the user is overriding the default value.
 		c := config.New(config.WithDefaultConfig(fileCfg))
-		if err := c.Load(filepath.Join(repoPath, config.FileName)); err != nil {
-			return err
+		if _, err := os.Stat(filepath.Join(repoPath, config.FileName)); err == nil {
+			if err := c.Load(filepath.Join(repoPath, config.FileName)); err != nil {
+				return err
+			}
 		}
+		r.EnsureRepoPathsConfigured(c)
 		resolvedCfg, err := c.Current()
 		if err != nil {
 			return err
@@ -67,6 +70,7 @@ var V2Migration = repo.NewMigration(
 			legacyStoreName := filepath.Join(repoPath, libp2pNodeID+"-compute")
 			newStorePath := filepath.Dir(executionStore.Path)
 			if _, err := os.Stat(legacyStoreName); err == nil {
+				// expecting compute_store for newStorePath
 				if err := os.Rename(legacyStoreName, newStorePath); err != nil {
 					return err
 				}

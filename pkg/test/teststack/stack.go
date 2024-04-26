@@ -4,24 +4,21 @@ package teststack
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/bacalhau-project/bacalhau/pkg/config"
-	"github.com/bacalhau-project/bacalhau/pkg/lib/provider"
-	"github.com/bacalhau-project/bacalhau/pkg/models"
-	"github.com/bacalhau-project/bacalhau/pkg/repo"
-	"github.com/bacalhau-project/bacalhau/pkg/setup"
-
 	"github.com/bacalhau-project/bacalhau/pkg/devstack"
 	"github.com/bacalhau-project/bacalhau/pkg/executor"
 	noop_executor "github.com/bacalhau-project/bacalhau/pkg/executor/noop"
+	"github.com/bacalhau-project/bacalhau/pkg/lib/provider"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
+	"github.com/bacalhau-project/bacalhau/pkg/models"
 	"github.com/bacalhau-project/bacalhau/pkg/node"
+	"github.com/bacalhau-project/bacalhau/pkg/repo"
 	"github.com/bacalhau-project/bacalhau/pkg/routing"
 	"github.com/bacalhau-project/bacalhau/pkg/system"
 )
@@ -47,36 +44,15 @@ func testDevStackConfig() *devstack.DevStackOptions {
 func Setup(
 	ctx context.Context,
 	t testing.TB,
+	fsr *repo.FsRepo,
+	cfg config.Context,
 	opts ...devstack.ConfigOption,
 ) *devstack.DevStack {
-	// NB: if a test suite has defined a repo use it, otherwise make one.
-	repoPath := os.Getenv("BACALHAU_DIR")
-	var fsRepo *repo.FsRepo
-	cfg := config.New()
-	if repoPath != "" {
-		var err error
-		fsRepo, err = repo.NewFS(repo.FsRepoParams{
-			Path: repoPath,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := fsRepo.Open(cfg); err != nil {
-			t.Fatal(err)
-		}
-
-		// TODO(ross) - Remove this once compute node registration lock does not rely on
-		// this config for finding it's storage path.
-		cfg.Set("repo", repoPath)
-	} else {
-		fsRepo = setup.SetupBacalhauRepoForTesting(t)
-	}
-
 	cm := system.NewCleanupManager()
 	t.Cleanup(func() {
 		cm.Cleanup(ctx)
 	})
-	stack, err := devstack.Setup(ctx, cfg, cm, fsRepo, append(testDevStackConfig().Options(), opts...)...)
+	stack, err := devstack.Setup(ctx, cfg, cm, fsr, append(testDevStackConfig().Options(), opts...)...)
 	if err != nil {
 		t.Fatalf("creating teststack: %s", err)
 	}

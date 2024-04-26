@@ -34,6 +34,9 @@ func initRepoFiles(cfg types.BacalhauConfig) error {
 	if err := initDir(cfg.Node.ComputeStoragePath); err != nil {
 		return fmt.Errorf("failed to create executor storage dir: %w", err)
 	}
+	if err := initDir(cfg.Node.Compute.DataPath); err != nil {
+		return fmt.Errorf("failed to create compute storage dir: %w", err)
+	}
 	if err := initParentDir(cfg.Node.Compute.ExecutionStore.Path); err != nil {
 		return fmt.Errorf("failed to create executor execution store dir: %w", err)
 	}
@@ -63,11 +66,10 @@ func validateRepoConfig(cfg types.BacalhauConfig) error {
 	} else if !exists {
 		return fmt.Errorf("executor plugin path does not exist at: %q", cfg.Node.ExecutorPluginPath)
 	}
-
-	if exists, err := fileExists(cfg.Node.ComputeStoragePath); err != nil {
+	if exists, err := fileExists(cfg.Node.Compute.DataPath); err != nil {
 		return err
 	} else if !exists {
-		return fmt.Errorf("compute storage path does not exist at: %q", cfg.Node.ComputeStoragePath)
+		return fmt.Errorf("compute storage path does not exist at: %q", cfg.Node.Compute.DataPath)
 	}
 
 	return nil

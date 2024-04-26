@@ -49,9 +49,9 @@ type RetriesSuite struct {
 
 func (s *RetriesSuite) SetupSuite() {
 	logger.ConfigureTestLogging(s.T())
-	setup.SetupBacalhauRepoForTesting(s.T())
+	fsr, cfg := setup.SetupBacalhauRepoForTesting(s.T())
 
-	computeConfig, err := node.NewComputeConfigWith(node.ComputeConfigParams{
+	computeConfig, err := node.NewComputeConfigWith(cfg, node.ComputeConfigParams{
 		BidSemanticStrategy: bidstrategy.NewFixedBidStrategy(false, false),
 		BidResourceStrategy: bidstrategy.NewFixedBidStrategy(false, false),
 	})
@@ -139,16 +139,17 @@ func (s *RetriesSuite) SetupSuite() {
 		},
 	)
 	s.Require().NoError(err)
-	stack := teststack.Setup(ctx, s.T(),
+	stack := teststack.Setup(ctx, s.T(), fsr, cfg,
 		devstack.WithNumberOfRequesterOnlyNodes(1),
 		devstack.WithNumberOfComputeOnlyNodes(len(nodeOverrides)-1),
 		devstack.WithNodeOverrides(nodeOverrides...),
 		devstack.WithRequesterConfig(requesterConfig),
-		teststack.WithNoopExecutor(noop_executor.ExecutorConfig{}),
+		teststack.WithNoopExecutor(noop_executor.ExecutorConfig{}, cfg),
 	)
 
 	s.requester = stack.Nodes[0]
-	s.client = client.NewAPIClient(client.NoTLS, s.requester.APIServer.Address, s.requester.APIServer.Port)
+	s.client, err = client.NewAPIClient(client.NoTLS, cfg, s.requester.APIServer.Address, s.requester.APIServer.Port)
+	s.Require().NoError(err)
 	s.stateResolver = legacy.NewStateResolver(s.requester.RequesterNode.JobStore)
 	nodeutils.WaitForNodeDiscovery(s.T(), s.requester.RequesterNode, len(nodeOverrides))
 }

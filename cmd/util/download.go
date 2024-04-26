@@ -46,7 +46,7 @@ func DownloadResultsHandler(
 		return nil
 	}
 
-	downloaderProvider := util.NewStandardDownloaders(cm)
+	downloaderProvider := util.NewStandardDownloaders(cm, cfg)
 	if err != nil {
 		return err
 	}

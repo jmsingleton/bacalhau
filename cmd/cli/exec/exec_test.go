@@ -5,10 +5,12 @@ package exec_test
 import (
 	"testing"
 
-	"github.com/bacalhau-project/bacalhau/cmd/cli/exec"
-	"github.com/bacalhau-project/bacalhau/pkg/models"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/bacalhau-project/bacalhau/cmd/cli/exec"
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/models"
 )
 
 type ExecSuite struct {
@@ -101,7 +103,8 @@ func (s *ExecSuite) TestJobPreparation() {
 	for _, tc := range testcases {
 		s.Run(tc.name, func() {
 			options := exec.NewExecOptions()
-			cmd := exec.NewCmdWithOptions(options)
+			c := config.New()
+			cmd := exec.NewCmdWithOptions(c, options)
 
 			testCaseF := s.testFuncForTestCase(tc)
 

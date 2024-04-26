@@ -9,11 +9,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
+	pkgconfig "github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/lib/provider"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	executor_util "github.com/bacalhau-project/bacalhau/pkg/executor/util"
 	"github.com/bacalhau-project/bacalhau/pkg/ipfs"
@@ -49,13 +51,13 @@ func (s *ParallelStorageSuite) SetupSuite() {
 	s.cid, err = client.Put(s.ctx, "../../testdata/grep_file.txt")
 	require.NoError(s.T(), err)
 
-	s.provider, _ = executor_util.NewStandardStorageProvider(
-		s.ctx,
-		s.cm,
+	c := pkgconfig.New()
+	s.provider, err = executor_util.NewStandardStorageProvider(c,
 		executor_util.StandardStorageProviderOptions{
 			API: client,
 		},
 	)
+	s.Require().NoError(err)
 }
 
 func (s *ParallelStorageSuite) TearDownSuite() {

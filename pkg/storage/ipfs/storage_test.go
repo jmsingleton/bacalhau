@@ -20,7 +20,7 @@ import (
 // how many bytes more does ipfs report the file than the actual content?
 const IpfsMetadataSize uint64 = 8
 
-func getIpfsStorage(t *testing.T) *StorageProvider {
+func getIpfsStorage(t *testing.T, c config.Context) *StorageProvider {
 	ctx := context.Background()
 	cm := system.NewCleanupManager()
 	t.Cleanup(func() {
@@ -30,7 +30,7 @@ func getIpfsStorage(t *testing.T) *StorageProvider {
 	node, err := ipfs.NewNodeWithConfig(ctx, cm, types.IpfsConfig{PrivateInternal: true})
 	require.NoError(t, err)
 
-	storage, err := NewStorage(node.Client())
+	storage, err := NewStorage(node.Client(), c)
 	require.NoError(t, err)
 
 	return storage
@@ -38,14 +38,15 @@ func getIpfsStorage(t *testing.T) *StorageProvider {
 
 func TestGetVolumeSize(t *testing.T) {
 	ctx := context.Background()
-	config.SetVolumeSizeRequestTimeout(time.Second * 3)
+	c := config.New()
+	config.SetVolumeSizeRequestTimeout(c, time.Second*3)
 
 	for _, testString := range []string{
 		"hello from test volume size",
 		"hello world",
 	} {
 		t.Run(testString, func(t *testing.T) {
-			storage := getIpfsStorage(t)
+			storage := getIpfsStorage(t, c)
 
 			cid, err := ipfs.AddTextToNodes(ctx, []byte(testString), storage.ipfsClient)
 			require.NoError(t, err)
@@ -74,7 +75,8 @@ func TestPrepareStorageRespectsTimeouts(t *testing.T) {
 		t.Run(fmt.Sprint(testDuration), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testDuration)
 			defer cancel()
-			storage := getIpfsStorage(t)
+			c := config.New()
+			storage := getIpfsStorage(t, c)
 
 			cid, err := ipfs.AddTextToNodes(ctx, []byte("testString"), storage.ipfsClient)
 			require.NoError(t, err)
@@ -100,12 +102,13 @@ func TestGetVolumeSizeRespectsTimeout(t *testing.T) {
 	} {
 		t.Run(fmt.Sprint(testDuration), func(t *testing.T) {
 			ctx := context.Background()
-			storage := getIpfsStorage(t)
+			c := config.New()
+			storage := getIpfsStorage(t, c)
 
 			cid, err := ipfs.AddTextToNodes(ctx, []byte("testString"), storage.ipfsClient)
 			require.NoError(t, err)
 
-			config.SetVolumeSizeRequestTimeout(testDuration)
+			config.SetVolumeSizeRequestTimeout(c, testDuration)
 			_, err = storage.GetVolumeSize(ctx, models.InputSource{
 				Source: &models.SpecConfig{
 					Type: models.StorageSourceIPFS,

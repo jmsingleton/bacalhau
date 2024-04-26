@@ -8,16 +8,20 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/downloader"
 	"github.com/bacalhau-project/bacalhau/pkg/downloader/util"
 	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels"
 	"github.com/bacalhau-project/bacalhau/pkg/system"
 )
 
-func SubmitAndGet(ctx context.Context) error {
+func SubmitAndGet(ctx context.Context, cfg config.Context) error {
 	// intentionally delay creation of the client so a new client is created for each
 	// scenario to mimic the behavior of bacalhau cli.
-	client := getClient()
+	client, err := getClient(cfg)
+	if err != nil {
+		return err
+	}
 
 	cm := system.NewCleanupManager()
 	j, err := getSampleDockerJob()
@@ -36,7 +40,7 @@ func SubmitAndGet(ctx context.Context) error {
 		return err
 	}
 
-	results, err := getClientV2().Jobs().Results(ctx, &apimodels.ListJobResultsRequest{
+	results, err := getClientV2(cfg).Jobs().Results(ctx, &apimodels.ListJobResultsRequest{
 		JobID: submittedJob.Metadata.ID,
 	})
 	if err != nil {
@@ -59,7 +63,7 @@ func SubmitAndGet(ctx context.Context) error {
 	}
 	downloadSettings.OutputDir = outputDir
 
-	downloaderProvider := util.NewStandardDownloaders(cm)
+	downloaderProvider := util.NewStandardDownloaders(cm, cfg)
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	"github.com/bacalhau-project/bacalhau/ops/aws/canary/pkg/models"
@@ -18,6 +17,7 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/devstack"
 	"github.com/bacalhau-project/bacalhau/pkg/ipfs"
 	"github.com/bacalhau-project/bacalhau/pkg/node"
+	"github.com/bacalhau-project/bacalhau/pkg/setup"
 	"github.com/bacalhau-project/bacalhau/pkg/test/teststack"
 	nodeutils "github.com/bacalhau-project/bacalhau/pkg/test/utils/node"
 )
@@ -33,7 +33,9 @@ func TestScenariosAgainstDevstack(t *testing.T) {
 	for i := 0; i < nodeCount; i++ {
 		nodeOverrides[i] = nodeOverride
 	}
-	stack := teststack.Setup(context.TODO(), t,
+	fsr, cfg := setup.SetupBacalhauRepoForTesting(t)
+
+	stack := teststack.Setup(context.TODO(), t, fsr, cfg,
 		devstack.WithNumberOfHybridNodes(1),
 		devstack.WithNumberOfComputeOnlyNodes(2),
 		devstack.WithNodeOverrides(nodeOverrides...),
@@ -64,14 +66,14 @@ func TestScenariosAgainstDevstack(t *testing.T) {
 	t.Log("Host set to", host)
 	t.Log("Port set to", port)
 
-	viper.Set(types.NodeClientAPIHost, host)
-	viper.Set(types.NodeClientAPIPort, port)
+	cfg.Set(types.NodeClientAPIHost, host)
+	cfg.Set(types.NodeClientAPIPort, port)
 	os.Setenv("BACALHAU_NODE_SELECTORS", "owner=bacalhau")
 
 	for name := range router.TestcasesMap {
 		t.Run(name, func(t *testing.T) {
 			event := models.Event{Action: name}
-			err := router.Route(context.Background(), event)
+			err := router.Route(context.Background(), cfg, event)
 			require.NoError(t, err)
 		})
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	pkgconfig "github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/ipfs"
 	"github.com/bacalhau-project/bacalhau/pkg/logger"
@@ -28,6 +29,7 @@ import (
 type StorageSuite struct {
 	suite.Suite
 	RootCmd *cobra.Command
+	Config  pkgconfig.Context
 }
 
 func TestStorageSuite(t *testing.T) {
@@ -37,10 +39,10 @@ func TestStorageSuite(t *testing.T) {
 // Before each test
 func (s *StorageSuite) SetupTest() {
 	logger.ConfigureTestLogging(s.T())
-	setup.SetupBacalhauRepoForTesting(s.T())
+	_, s.Config = setup.SetupBacalhauRepoForTesting(s.T())
 }
 
-func getIpfsStorage() (*apicopy.StorageProvider, error) {
+func getIpfsStorage(c pkgconfig.Context) (*apicopy.StorageProvider, error) {
 	ctx := context.Background()
 	cm := system.NewCleanupManager()
 
@@ -51,7 +53,7 @@ func getIpfsStorage() (*apicopy.StorageProvider, error) {
 	}
 
 	cl := ipfs.NewClient(node.Client().API)
-	storage, err := apicopy.NewStorage(cl)
+	storage, err := apicopy.NewStorage(cl, c)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +63,7 @@ func getIpfsStorage() (*apicopy.StorageProvider, error) {
 
 func (s *StorageSuite) TestHasStorageLocally() {
 	ctx := context.Background()
-	storage, err := getIpfsStorage()
+	storage, err := getIpfsStorage(s.Config)
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +111,7 @@ func (s *StorageSuite) TestCloneRepo() {
 
 		hash, err := func() (string, error) {
 			ctx := context.Background()
-			storage, err := getIpfsStorage()
+			storage, err := getIpfsStorage(s.Config)
 			if err != nil {
 				panic(err)
 			}

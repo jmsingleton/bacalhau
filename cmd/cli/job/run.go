@@ -80,6 +80,7 @@ func NewRunCmd(cfg config.Context) *cobra.Command {
 	return runCmd
 }
 
+//nolint:gocyclo
 func (o *RunOptions) run(cmd *cobra.Command, cfg config.Context, args []string) error {
 	ctx := cmd.Context()
 

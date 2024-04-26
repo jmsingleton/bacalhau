@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/repo"
-	"github.com/stretchr/testify/suite"
 )
 
 type V2MigrationsTestSuite struct {
@@ -34,6 +35,7 @@ func TestV2MigrationsTestSuite(t *testing.T) {
 }
 
 func (suite *V2MigrationsTestSuite) TestV2MigrationWithDefaultRepo() {
+	c := config.New()
 	libp2pPeerID := "QmUBgU7xHKK44RuTHgrvnJfoSdZJS4fddT197iyTF5qjEV"
 
 	// Copy test data to the suite's temporary directory
@@ -44,7 +46,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWithDefaultRepo() {
 	suite.verifyInitialState(libp2pPeerID)
 
 	// open the repo to trigger the migration
-	suite.Require().NoError(suite.repo.Open())
+	suite.Require().NoError(suite.repo.Open(c))
 
 	repoVersion, err := suite.repo.Version()
 	suite.Require().NoError(err)
@@ -65,6 +67,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWithDefaultRepo() {
 // TestV2MigrationWitCustomConfig test that migration with custom configs exist will not be modified
 // and only execution and job store paths will be added
 func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomConfig() {
+	c := config.New()
 	libp2pPeerID := "QmUBgU7xHKK44RuTHgrvnJfoSdZJS4fddT197iyTF5qjEV"
 
 	// Copy test data to the suite's temporary directory
@@ -75,7 +78,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomConfig() {
 	suite.verifyInitialState(libp2pPeerID)
 
 	// open the repo to trigger the migration
-	suite.Require().NoError(suite.repo.Open())
+	suite.Require().NoError(suite.repo.Open(c))
 
 	// verify the repo version was updated
 	repoVersion, err := suite.repo.Version()
@@ -97,6 +100,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomConfig() {
 
 // TestV2MigrationWitCustomStores test that migration with custom stores will not be modified
 func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomStores() {
+	c := config.New()
 	nodeName := "foo"
 	libp2pPeerID := "QmUBgU7xHKK44RuTHgrvnJfoSdZJS4fddT197iyTF5qjEV"
 
@@ -108,7 +112,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomStores() {
 	suite.verifyInitialState(libp2pPeerID)
 
 	// open the repo to trigger the migration
-	suite.Require().NoError(suite.repo.Open())
+	suite.Require().NoError(suite.repo.Open(c))
 
 	// verify the repo version was updated
 	repoVersion, err := suite.repo.Version()
@@ -130,6 +134,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWitCustomStores() {
 
 // TestV2MigrationWithEmptyStorePaths test that migration with store config exist, but with empty paths
 func (suite *V2MigrationsTestSuite) TestV2MigrationWithEmptyStorePaths() {
+	c := config.New()
 	libp2pPeerID := "QmUBgU7xHKK44RuTHgrvnJfoSdZJS4fddT197iyTF5qjEV"
 
 	// Copy test data to the suite's temporary directory
@@ -140,7 +145,7 @@ func (suite *V2MigrationsTestSuite) TestV2MigrationWithEmptyStorePaths() {
 	suite.verifyInitialState(libp2pPeerID)
 
 	// open the repo to trigger the migration
-	suite.Require().NoError(suite.repo.Open())
+	suite.Require().NoError(suite.repo.Open(c))
 
 	repoVersion, err := suite.repo.Version()
 	suite.Require().NoError(err)

@@ -112,7 +112,7 @@ func (fsr *FsRepo) Init(c config.Context) error {
 		}
 	}
 
-	fsr.ensureRepoPathsConfigured(c)
+	fsr.EnsureRepoPathsConfigured(c)
 
 	cfg, err := c.Current()
 	if err != nil {
@@ -143,17 +143,16 @@ func (fsr *FsRepo) Open(c config.Context) error {
 	}
 
 	// load the configuration for the repo.
-	// TODO(forrest) [correctness] may still need to check if the file exists before attempting to load it
-	// as repos without a config file are still valid. Even though we currently ensure one is created there is no
-	// reason a user cannot delete it, although perhaps we should enforce its presence here.
-	// many other apps failed if you delete their config file after they created one.
+	// Repos without a config file are still valid. So check if one is present.
 	if _, err := os.Stat(fsr.join(config.FileName)); err == nil {
 		if err := c.Load(fsr.join(config.FileName)); err != nil {
 			return fmt.Errorf("failed to load config file present in repo: %w", err)
 		}
 	}
 
-	fsr.ensureRepoPathsConfigured(c)
+	// modifies the config to include keys for accessing repo paths if they are not set.
+	// This ensures either user provided paths are valid to default paths for the repo are set.
+	fsr.EnsureRepoPathsConfigured(c)
 
 	cfg, err := c.Current()
 	if err != nil {
@@ -240,14 +239,14 @@ func (fsr *FsRepo) WriteRunInfo(ctx context.Context, summaryShellVariablesString
 }
 
 // modifies the config to include keys for accessing repo paths
-func (fsr *FsRepo) ensureRepoPathsConfigured(c config.Context) {
+func (fsr *FsRepo) EnsureRepoPathsConfigured(c config.Context) {
 	c.SetIfAbsent(types.AuthTokensPath, fsr.join(config.TokensPath))
 	c.SetIfAbsent(types.UserKeyPath, fsr.join(config.UserPrivateKeyFileName))
 	c.SetIfAbsent(types.NodeExecutorPluginPath, fsr.join(config.PluginsPath))
 
 	// NB(forrest): pay attention to the subtle name difference here
-	c.SetIfAbsent(types.NodeComputeStoragePath, fsr.join(config.ComputeStoragesPath))
-	c.SetIfAbsent(types.NodeComputeDataPath, fsr.join(config.ComputeStorePath))
+	c.SetIfAbsent(types.NodeComputeDataPath, fsr.join(config.ComputeStoragesPath))
+	c.SetIfAbsent(types.NodeComputeStoragePath, fsr.join(config.ComputeStorePath))
 
 	c.SetIfAbsent(types.UpdateCheckStatePath, fsr.join(config.UpdateCheckStatePath))
 	c.SetIfAbsent(types.NodeClientAPITLSAutoCertCachePath, fsr.join(config.AutoCertCachePath))
@@ -255,5 +254,5 @@ func (fsr *FsRepo) ensureRepoPathsConfigured(c config.Context) {
 	c.SetIfAbsent(types.NodeNetworkStoreDir, fsr.join(config.OrchestratorStorePath, config.NetworkTransportStore))
 
 	c.SetIfAbsent(types.NodeRequesterJobStorePath, fsr.join(config.OrchestratorStorePath, "jobs.db"))
-	c.SetIfAbsent(types.NodeComputeExecutionStorePath, fsr.join(config.ComputeStoragesPath, "executions.db"))
+	c.SetIfAbsent(types.NodeComputeExecutionStorePath, fsr.join(config.ComputeStorePath, "executions.db"))
 }

@@ -48,10 +48,11 @@ type LegacyTLSSupport struct {
 
 // NewAPIClient returns a new client for a node's API server against v1 APIs
 // the client will use /api/v1 path by default is no custom path is defined
+// Deprecated: use util.GetAPIClient
+// TODOD(forrest) [WTF]: just more spaghetti. This needs to be a private method called from util.GetAPIClient
 func NewAPIClient(
 	tlsinfo LegacyTLSSupport,
 	c config.Context,
-	s system.Signer,
 	host string,
 	port uint16,
 	path ...string,
@@ -59,6 +60,11 @@ func NewAPIClient(
 	scheme := "http"
 	if tlsinfo.UseTLS {
 		scheme = "https"
+	}
+
+	sk, err := config.GetClientPrivateKey(c)
+	if err != nil {
+		return nil, err
 	}
 
 	baseURI := system.MustParseURL(fmt.Sprintf("%s://%s:%d", scheme, host, port)).JoinPath(path...)
@@ -73,7 +79,7 @@ func NewAPIClient(
 	return &APIClient{
 		BaseURI:        baseURI,
 		DefaultHeaders: map[string]string{},
-		Signer:         s,
+		Signer:         system.NewMessageSigner(sk),
 		ClientID:       clientID,
 		Config:         c,
 

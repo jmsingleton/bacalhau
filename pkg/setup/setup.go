@@ -54,9 +54,8 @@ func SetupBacalhauRepo(repoDir string, c config.Context) (*repo.FsRepo, error) {
 	return fsRepo, nil
 }
 
-func SetupBacalhauRepoForTesting(t testing.TB) *repo.FsRepo {
+func SetupBacalhauRepoForTesting(t testing.TB) (*repo.FsRepo, config.Context) {
 	cfg := config.New(config.WithDefaultConfig(configenv.Local))
-
 	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(errors.Wrap(err, "failed to create temporary directory in test setup"))
@@ -80,5 +79,5 @@ func SetupBacalhauRepoForTesting(t testing.TB) *repo.FsRepo {
 		}
 	})
 
-	return fsRepo
+	return fsRepo, cfg
 }

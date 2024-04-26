@@ -10,9 +10,6 @@ import (
 
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/models"
-	"github.com/bacalhau-project/bacalhau/pkg/publicapi/client"
-	"github.com/bacalhau-project/bacalhau/pkg/system"
-
 	"github.com/bacalhau-project/bacalhau/pkg/version"
 )
 
@@ -27,17 +24,11 @@ func GetAllVersions(ctx context.Context, c config.Context) (Versions, error) {
 	var err error
 	versions := Versions{ClientVersion: version.Get()}
 
-	legacyTLS := client.LegacyTLSSupport(config.ClientTLSConfig(c))
-	sk, err := config.GetClientPrivateKey(c)
+	api, err := GetAPIClient(c)
 	if err != nil {
-		return versions, err
+		return Versions{}, err
 	}
-	signer := system.NewMessageSigner(sk)
-	client, err := client.NewAPIClient(legacyTLS, c, signer, config.ClientAPIHost(c), config.ClientAPIPort(c))
-	if err != nil {
-		return versions, err
-	}
-	versions.ServerVersion, err = client.Version(ctx)
+	versions.ServerVersion, err = api.Version(ctx)
 	if err != nil {
 		return versions, errors.Wrap(err, "error running version command")
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/publicapi/client"
 	clientv2 "github.com/bacalhau-project/bacalhau/pkg/publicapi/client/v2"
 	"github.com/bacalhau-project/bacalhau/pkg/setup"
-	"github.com/bacalhau-project/bacalhau/pkg/system"
 	"github.com/bacalhau-project/bacalhau/pkg/version"
 )
 
@@ -33,14 +32,8 @@ func GetAPIClient(c config.Context) (*client.APIClient, error) {
 		return nil, err
 	}
 
-	sk, err := config.GetClientPrivateKey(c)
-	if err != nil {
-		return nil, err
-	}
-	signer := system.NewMessageSigner(sk)
-
 	var tlsCfg types.ClientTLSConfig
-	if err := c.ForKey(types.NodeClientAPITLS, &tlsCfg); err != nil {
+	if err := c.ForKey(types.NodeClientAPIClientTLS, &tlsCfg); err != nil {
 		return nil, err
 	}
 	var apiHost string
@@ -52,7 +45,7 @@ func GetAPIClient(c config.Context) (*client.APIClient, error) {
 		return nil, err
 	}
 	legacyTLS := client.LegacyTLSSupport(tlsCfg)
-	apiClient, err := client.NewAPIClient(legacyTLS, c, signer, apiHost, apiPort)
+	apiClient, err := client.NewAPIClient(legacyTLS, c, apiHost, apiPort)
 	if err != nil {
 		return nil, err
 	}

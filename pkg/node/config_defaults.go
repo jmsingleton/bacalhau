@@ -41,7 +41,6 @@ func NewDefaultComputeParam(c config.Context) ComputeConfigParams {
 			HeartbeatTopic:          "heartbeat",
 		},
 	}
-
 }
 
 var DefaultRequesterConfig = RequesterConfigParams{

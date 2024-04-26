@@ -51,7 +51,7 @@ func BindFlags(cmd *cobra.Command, c config.Context, register map[string][]Defin
 			// sanity check to ensure we are not binding a config key on more than one flag.
 			if dup, ok := seen[def.ConfigPath]; ok {
 				return fmt.Errorf("DEVELOPER ERROR: duplicate regsistration of config key %s for flag %s"+
-					" previously registerd on on flag %s", def.ConfigPath, def.FlagName, dup.FlagName)
+					" previously registered on on flag %s", def.ConfigPath, def.FlagName, dup.FlagName)
 			}
 			seen[def.ConfigPath] = def
 

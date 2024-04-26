@@ -91,7 +91,7 @@ func setConfig(c config.Context, key string, values ...string) error {
 	configFile := c.User().ConfigFileUsed()
 	if configFile == "" {
 		// if there isn't a config file, we'll assume we add it to the current repo.
-		configFile = filepath.Join(viper.GetString("repo"), "config.yaml")
+		configFile = filepath.Join(c.System().GetString("repo"), "config.yaml")
 	}
 
 	viperWriter, err := getWriter(configFile)

@@ -41,7 +41,6 @@ func TestComputeNodeResourceLimitsSuite(t *testing.T) {
 
 func (suite *ComputeNodeResourceLimitsSuite) SetupTest() {
 	logger.ConfigureTestLogging(suite.T())
-	setup.SetupBacalhauRepoForTesting(suite.T())
 }
 
 type SeenJobRecord struct {
@@ -83,6 +82,7 @@ func (suite *ComputeNodeResourceLimitsSuite) TestTotalResourceLimits() {
 		testCase TotalResourceTestCase,
 	) {
 		ctx := context.Background()
+		fsr, c := setup.SetupBacalhauRepoForTesting(suite.T())
 
 		epochSeconds := time.Now().Unix()
 
@@ -128,13 +128,12 @@ func (suite *ComputeNodeResourceLimitsSuite) TestTotalResourceLimits() {
 		parsedResources, err := resourcesConfig.ToResources()
 		require.NoError(suite.T(), err)
 
-		computeConfig, err := node.NewComputeConfigWith(node.ComputeConfigParams{
+		computeConfig, err := node.NewComputeConfigWith(c, node.ComputeConfigParams{
 			TotalResourceLimits:          *parsedResources,
 			IgnorePhysicalResourceLimits: true, // in case circleci is running on a small machine
 		})
 		suite.Require().NoError(err)
-		stack := teststack.Setup(ctx,
-			suite.T(),
+		stack := teststack.Setup(ctx, suite.T(), fsr, c,
 			devstack.WithNumberOfHybridNodes(1),
 			devstack.WithComputeConfig(computeConfig),
 			teststack.WithNoopExecutor(noop_executor.ExecutorConfig{
@@ -142,7 +141,7 @@ func (suite *ComputeNodeResourceLimitsSuite) TestTotalResourceLimits() {
 					JobHandler:    jobHandler,
 					GetVolumeSize: getVolumeSizeHandler,
 				},
-			}),
+			}, c),
 		)
 
 		for _, jobResources := range testCase.jobs {
@@ -290,7 +289,9 @@ func (suite *ComputeNodeResourceLimitsSuite) TestParallelGPU() {
 		return &models.RunCommandResult{}, nil
 	}
 
-	computeConfig, err := node.NewComputeConfigWith(node.ComputeConfigParams{
+	fsr, c := setup.SetupBacalhauRepoForTesting(suite.T())
+
+	computeConfig, err := node.NewComputeConfigWith(c, node.ComputeConfigParams{
 		TotalResourceLimits: models.Resources{
 			CPU:    1,
 			Memory: 1 * 1024 * 1024 * 1024,
@@ -301,8 +302,7 @@ func (suite *ComputeNodeResourceLimitsSuite) TestParallelGPU() {
 		IgnorePhysicalResourceLimits: true, // we need to pretend that we have GPUs on each node
 	})
 	suite.Require().NoError(err)
-	stack := teststack.Setup(ctx,
-		suite.T(),
+	stack := teststack.Setup(ctx, suite.T(), fsr, c,
 		devstack.WithNumberOfHybridNodes(1),
 		devstack.WithNumberOfComputeOnlyNodes(1),
 		devstack.WithComputeConfig(computeConfig),
@@ -311,7 +311,7 @@ func (suite *ComputeNodeResourceLimitsSuite) TestParallelGPU() {
 				ExternalHooks: noop_executor.ExecutorConfigExternalHooks{
 					JobHandler: jobHandler,
 				},
-			}),
+			}, c),
 	)
 
 	// for the requester node to pick up the nodeInfo messages

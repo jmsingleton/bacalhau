@@ -130,6 +130,7 @@ func NewComputeConfigWithDefaults(c config.Context) (ComputeConfig, error) {
 	return NewComputeConfigWith(c, NewDefaultComputeParam(c))
 }
 
+//nolint:funlen
 func NewComputeConfigWith(c config.Context, params ComputeConfigParams) (ComputeConfig, error) {
 	defaults := NewDefaultComputeParam(c)
 	if params.JobNegotiationTimeout == 0 {

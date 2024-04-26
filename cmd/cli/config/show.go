@@ -2,7 +2,6 @@ package config
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	"github.com/bacalhau-project/bacalhau/pkg/config"
@@ -27,7 +26,7 @@ func newShowCmd(cfg config.Context) *cobra.Command {
 			return showConfig(cmd, cfg)
 		},
 	}
-	showCmd.PersistentFlags().String("path", viper.GetString("repo"), "sets path dependent config fields")
+	showCmd.PersistentFlags().String("path", cfg.System().GetString("repo"), "sets path dependent config fields")
 	return showCmd
 }
 

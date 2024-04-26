@@ -4,17 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels/legacymodels"
 	"github.com/rs/zerolog/log"
+
+	"github.com/bacalhau-project/bacalhau/pkg/config"
+	"github.com/bacalhau-project/bacalhau/pkg/publicapi/apimodels/legacymodels"
 )
 
 // This scenario mainly calls the same client APIs that describe cmd does.
 // It doesn't do much validation except making sure the calls don't fail.
 // TODO: we should introduce a describe API and move all the logic there instead of cmd/describe.go
-func SubmitAnDescribe(ctx context.Context) error {
+func SubmitAnDescribe(ctx context.Context, cfg config.Context) error {
 	// intentionally delay creation of the client so a new client is created for each
 	// scenario to mimic the behavior of bacalhau cli.
-	client := getClient()
+	client, err := getClient(cfg)
+	if err != nil {
+		return err
+	}
 
 	j, err := getSampleDockerJob()
 	if err != nil {

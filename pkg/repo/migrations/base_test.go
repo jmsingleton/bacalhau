@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bacalhau-project/bacalhau/pkg/repo"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/bacalhau-project/bacalhau/pkg/repo"
 )
 
 const (
@@ -23,7 +23,6 @@ type BaseMigrationTestSuite struct {
 
 // SetupTest runs before each test in the suite.
 func (suite *BaseMigrationTestSuite) SetupTest() {
-	viper.Reset()
 	suite.TempDir = suite.T().TempDir() // Create a temporary directory for testing
 }
 

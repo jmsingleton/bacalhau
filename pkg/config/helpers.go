@@ -136,7 +136,6 @@ func convertToClientID(key *rsa.PublicKey) string {
 	hashBytes := hash.Sum(nil)
 
 	return fmt.Sprintf("%x", hashBytes)
-
 }
 
 func ClientAPIPort(c Context) uint16 {
@@ -395,17 +394,17 @@ func loadLibp2pPrivKey(c Context) (libp2p_crypto.PrivKey, error) {
 
 	keyBytes, err := os.ReadFile(keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
+		return nil, fmt.Errorf("failed to read private key: %w", err)
 	}
 	// base64 decode keyBytes
 	b64, err := base64.StdEncoding.DecodeString(string(keyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode private key: %v", err)
+		return nil, fmt.Errorf("failed to decode private key: %w", err)
 	}
 	// parse the private key
 	key, err := libp2p_crypto.UnmarshalPrivateKey(b64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 	return key, nil
 }

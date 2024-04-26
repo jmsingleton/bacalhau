@@ -115,7 +115,7 @@ func (c *config) Load(path string) error {
 	}
 	c.user.SetConfigFile(path)
 	if err := c.user.ReadInConfig(); err != nil {
-		return fmt.Errorf("failed to load config file")
+		return fmt.Errorf("failed to load config file: %w", err)
 	}
 	return nil
 }
@@ -126,7 +126,6 @@ func (c *config) Current() (types.BacalhauConfig, error) {
 		return types.BacalhauConfig{}, err
 	}
 	return *out, nil
-
 }
 
 // Set sets the configuration value.
@@ -137,8 +136,6 @@ func (c *config) Set(key string, value interface{}) {
 }
 
 func (c *config) SetIfAbsent(key string, value interface{}) {
-	thing := c.user.Get(key)
-	_ = thing
 	if !c.user.IsSet(key) || reflect.ValueOf(c.user.Get(key)).IsZero() {
 		c.Set(key, value)
 	}
