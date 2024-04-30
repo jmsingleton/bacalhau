@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -36,6 +37,17 @@ func GetAPIClient(c config.Context) (*client.APIClient, error) {
 	if err := c.ForKey(types.NodeClientAPIClientTLS, &tlsCfg); err != nil {
 		return nil, err
 	}
+	// TODO(forrest): this could be moved to a validate method on the config structure.
+	// we do this here because when we create a new client below it will panic if a file is provided that doesn't
+	// exist. The correct change is of course not to panic there.
+	if tlsCfg.CACert != "" {
+		if _, err := os.Stat(tlsCfg.CACert); os.IsNotExist(err) {
+			return nil, fmt.Errorf("CA certificate file %q does not exists", tlsCfg.CACert)
+		} else if err != nil {
+			return nil, fmt.Errorf("CA certificate file %q cannot be read: %w", tlsCfg.CACert, err)
+		}
+	}
+
 	var apiHost string
 	if err := c.ForKey(types.NodeClientAPIHost, &apiHost); err != nil {
 		return nil, err
@@ -89,6 +101,17 @@ func GetAPIClientV2(cmd *cobra.Command, c config.Context) (clientv2.API, error) 
 	if err := c.ForKey(types.NodeClientAPITLS, &tlsCfg); err != nil {
 		return nil, err
 	}
+	// TODO(forrest): this could be moved to a validate method on the config structure.
+	// we do this here because when we create a new client below it will panic if a file is provided that doesn't
+	// exist. The correct change is of course not to panic there.
+	if tlsCfg.CACert != "" {
+		if _, err := os.Stat(tlsCfg.CACert); os.IsNotExist(err) {
+			return nil, fmt.Errorf("CA certificate file %q does not exists", tlsCfg.CACert)
+		} else if err != nil {
+			return nil, fmt.Errorf("CA certificate file %q cannot be read: %w", tlsCfg.CACert, err)
+		}
+	}
+
 	var apiHost string
 	if err := c.ForKey(types.NodeClientAPIHost, &apiHost); err != nil {
 		return nil, err
