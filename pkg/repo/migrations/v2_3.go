@@ -21,7 +21,7 @@ var V2Migration = repo.NewMigration(
 	repo.RepoVersion2,
 	repo.RepoVersion3,
 	func(r repo.FsRepo) error {
-		v, fileCfg, err := readConfig(r)
+		currentCtx, currentCfg, err := readConfig(r)
 		if err != nil {
 			return err
 		}
@@ -32,18 +32,18 @@ var V2Migration = repo.NewMigration(
 		// we load the config to resolve the libp2p node id. Loading the config this way will also
 		// use default values, args and env vars to fill in the config, so we can be sure we are
 		// reading the correct libp2p key in case the user is overriding the default value.
-		c := config.New(config.WithDefaultConfig(fileCfg))
+		newCtx := config.New()
 		if _, err := os.Stat(filepath.Join(repoPath, config.FileName)); err == nil {
-			if err := c.Load(filepath.Join(repoPath, config.FileName)); err != nil {
+			if err := newCtx.Load(filepath.Join(repoPath, config.FileName)); err != nil {
 				return err
 			}
 		}
-		r.EnsureRepoPathsConfigured(c)
-		resolvedCfg, err := c.Current()
+		r.EnsureRepoPathsConfigured(newCtx)
+		resolvedCfg, err := newCtx.Current()
 		if err != nil {
 			return err
 		}
-		libp2pNodeID, err := getLibp2pNodeID(c)
+		libp2pNodeID, err := getLibp2pNodeID(newCtx)
 		if err != nil {
 			return err
 		}
@@ -51,12 +51,12 @@ var V2Migration = repo.NewMigration(
 		doWrite := false
 		var logMessage strings.Builder
 		set := func(key string, value interface{}) {
-			v.Set(key, value)
+			currentCtx.Set(key, value)
 			logMessage.WriteString(fmt.Sprintf("\n%s:\t%v", key, value))
 			doWrite = true
 		}
 
-		if fileCfg.Node.Compute.ExecutionStore.Path == "" {
+		if currentCfg.Node.Compute.ExecutionStore.Path == "" {
 			// persist the execution store in the repo
 			executionStore := resolvedCfg.Node.Compute.ExecutionStore
 
@@ -80,7 +80,7 @@ var V2Migration = repo.NewMigration(
 			set(types.NodeComputeExecutionStore, executionStore)
 		}
 
-		if fileCfg.Node.Requester.JobStore.Path == "" {
+		if currentCfg.Node.Requester.JobStore.Path == "" {
 			// persist the job store in the repo
 			jobStore := resolvedCfg.Node.Requester.JobStore
 
@@ -103,12 +103,13 @@ var V2Migration = repo.NewMigration(
 			set(types.NodeRequesterJobStore, jobStore)
 		}
 
-		if fileCfg.Node.Name == "" {
+		if currentCfg.Node.Name == "" {
 			set(types.NodeName, libp2pNodeID)
 		}
 
 		if doWrite {
-			return v.WriteConfig()
+			currentCtx.User().SetConfigFile(filepath.Join(repoPath, config.FileName))
+			return currentCtx.User().WriteConfig()
 		}
 		return nil
 	})

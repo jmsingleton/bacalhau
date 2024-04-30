@@ -109,7 +109,7 @@ func (c *config) RepoPath() (string, error) {
 func (c *config) Load(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// if the config file doesn't exist then we obviously cannot load it
-		return fmt.Errorf("config file not found at at path: %q", path)
+		return fmt.Errorf("config file not found at at path: %q: %w", path, err)
 	} else if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}

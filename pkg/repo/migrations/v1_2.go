@@ -37,7 +37,7 @@ var V1Migration = repo.NewMigration(
 		if !configExist {
 			return nil
 		}
-		v, cfg, err := readConfig(r)
+		currentCtx, cfg, err := readConfig(r)
 		if err != nil {
 			return err
 		}
@@ -46,16 +46,16 @@ var V1Migration = repo.NewMigration(
 		// if no incorrect values are present they are left as is.
 		doWrite := false
 		if haveSameElements(oldSwarmPeers, cfg.Node.IPFS.SwarmAddresses) {
-			v.Set(types.NodeIPFSSwarmAddresses, []string{})
+			currentCtx.Set(types.NodeIPFSSwarmAddresses, []string{})
 			doWrite = true
 		}
 		if haveSameElements(oldBootstrapPeers, cfg.Node.BootstrapAddresses) {
-			v.Set(types.NodeBootstrapAddresses, []string{})
+			currentCtx.Set(types.NodeBootstrapAddresses, []string{})
 			doWrite = true
 		}
 
 		if doWrite {
-			return v.WriteConfig()
+			return currentCtx.User().WriteConfig()
 		}
 		return nil
 	})

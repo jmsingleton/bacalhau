@@ -1,36 +1,33 @@
 package migrations
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/spf13/viper"
 
 	"github.com/bacalhau-project/bacalhau/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/config/types"
 	"github.com/bacalhau-project/bacalhau/pkg/repo"
 )
 
-func getViper(r repo.FsRepo) (*viper.Viper, error) {
+func getConfigContext(r repo.FsRepo) (config.Context, error) {
 	repoPath, err := r.Path()
 	if err != nil {
 		return nil, err
 	}
 
 	configFile := filepath.Join(repoPath, config.FileName)
-	v := viper.New()
-	v.SetTypeByDefaultValue(true)
-	v.SetConfigFile(configFile)
-
+	c := config.New()
 	// read existing config file if it exists
-	if err := v.ReadInConfig(); err != nil {
-		if !os.IsNotExist(err) {
+	if err := c.Load(configFile); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	}
-	return v, nil
+
+	return c, nil
 }
 
 func configExists(r repo.FsRepo) (bool, error) {
@@ -47,16 +44,16 @@ func configExists(r repo.FsRepo) (bool, error) {
 	return err == nil, err
 }
 
-func readConfig(r repo.FsRepo) (*viper.Viper, types.BacalhauConfig, error) {
-	v, err := getViper(r)
+func readConfig(r repo.FsRepo) (config.Context, types.BacalhauConfig, error) {
+	c, err := getConfigContext(r)
 	if err != nil {
 		return nil, types.BacalhauConfig{}, err
 	}
-	var fileCfg types.BacalhauConfig
-	if err := v.Unmarshal(&fileCfg, config.DecoderHook); err != nil {
-		return v, types.BacalhauConfig{}, fmt.Errorf("failed to unmarshal config file: %w", err)
+	cfg, err := c.Current()
+	if err != nil {
+		return nil, types.BacalhauConfig{}, err
 	}
-	return v, fileCfg, nil
+	return c, cfg, nil
 }
 
 // haveSameElements returns true if arr1 and arr2 have the same elements, false otherwise.
